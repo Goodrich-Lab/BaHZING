@@ -27,6 +27,7 @@ jobs:
         with:
           extra-packages: any::covr, any::xml2
           needs: coverage
+          
       - name: Install dependencies
         run: |
           install.packages('remotes')  # Required to install from GitHub or other sources
@@ -36,9 +37,9 @@ jobs:
 
       # Add the R CMD check step here
       - name: Run R CMD check
-      run: |
-        R CMD build .
-        R CMD check *tar.gz
+        run: |
+          R CMD build .
+          R CMD check *tar.gz
 
       - name: Test coverage
         run: |
