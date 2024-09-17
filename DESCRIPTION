@@ -12,7 +12,10 @@ Imports:
     phyloseq,
     stringr,
     rjags,
-    R2jags
+    R2jags,
+    ggplot2,
+    pscl,
+    qgcomp
 Suggests:
     covr,
     testthat (>= 3.0.0)
