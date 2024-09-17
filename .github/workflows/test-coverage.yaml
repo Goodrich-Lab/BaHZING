@@ -27,6 +27,18 @@ jobs:
         with:
           extra-packages: any::covr, any::xml2
           needs: coverage
+          
+      - name: Install dependencies
+        run: |
+          install.packages('pscl')  # Install pscl (or any other missing package)
+        shell: Rscript {0}
+
+      # Add the R CMD check step here
+      - name: Run R CMD check
+        run: |
+          R CMD build .
+          R CMD check *tar.gz
+        shell: bash
 
       - name: Test coverage
         run: |
