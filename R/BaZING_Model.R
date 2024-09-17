@@ -26,8 +26,8 @@ BaZING_Model <- function(formatted_data,
                          covar,x,
                          n.chains = 3,
                          n.adapt = 100,
-                         n.iter.update = 5,
-                         n.iter.coda = 5) {
+                         n.iter.update = 2,
+                         n.iter.coda = 2) {
 
   #Extract metaddata file from formatted data
   Object <- data.frame(formatted_data$Table)

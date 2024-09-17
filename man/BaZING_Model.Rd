@@ -11,8 +11,8 @@ BaZING_Model(
   x,
   n.chains = 3,
   n.adapt = 100,
-  n.iter.update = 5,
-  n.iter.coda = 5
+  n.iter.update = 2,
+  n.iter.coda = 2
 )
 }
 \arguments{

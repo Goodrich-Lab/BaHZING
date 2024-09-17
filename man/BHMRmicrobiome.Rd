@@ -12,12 +12,14 @@ Format_BaZING(phyloseq.object)
 }
 \value{
 A list with the following elements:
-  - `Table`: Formatted microbiome data as a data frame.
-  - `Species.Genus.Matrix`: Data frame for species-genus relationships (optional).
-  - `Genus.Family.Matrix`: Data frame for genus-family relationships (optional).
-  - `Family.Order.Matrix`: Data frame for family-order relationships (optional).
-  - `Order.Class.Matrix`: Data frame for order-class relationships (optional).
-  - `Class.Phylum.Matrix`: Data frame for class-phylum relationships (optional).
+\itemize{
+\item \code{Table}: Formatted microbiome data as a data frame.
+\item \code{Species.Genus.Matrix}: Data frame for species-genus relationships (optional).
+\item \code{Genus.Family.Matrix}: Data frame for genus-family relationships (optional).
+\item \code{Family.Order.Matrix}: Data frame for family-order relationships (optional).
+\item \code{Order.Class.Matrix}: Data frame for order-class relationships (optional).
+\item \code{Class.Phylum.Matrix}: Data frame for class-phylum relationships (optional).
+}
 }
 \description{
 This function takes a phyloseq object and performs formatting operations on it,
