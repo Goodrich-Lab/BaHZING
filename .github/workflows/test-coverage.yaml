@@ -29,10 +29,10 @@ jobs:
           needs: coverage
       - name: Install dependencies
         run: |
-        install.packages('remotes')  # Required to install from GitHub or other sources
-        remotes::install_deps(dependencies = TRUE)  # Install all dependencies listed in DESCRIPTION
-        install.packages('covr')  # Install covr for test coverage
-        install.packages('pscl')  # Install pscl (or any other missing package)
+          install.packages('remotes')  # Required to install from GitHub or other sources
+          remotes::install_deps(dependencies = TRUE)  # Install all dependencies listed in DESCRIPTION
+          install.packages('covr')  # Install covr for test coverage
+          install.packages('pscl')  # Install pscl (or any other missing package)
 
       # Add the R CMD check step here
       - name: Run R CMD check
