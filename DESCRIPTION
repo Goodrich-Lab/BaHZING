@@ -14,8 +14,7 @@ Imports:
     rjags,
     R2jags,
     ggplot2,
-    pscl,
-    qgcomp
+    pscl
 Suggests:
     covr,
     testthat (>= 3.0.0)
