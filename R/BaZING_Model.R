@@ -14,10 +14,12 @@
 #' @param formatted_data An object containing formatted microbiome data.
 #' @param covar A vector of covariates.
 #' @param x A vector of exposures.
-#' @param n.chain the number of parallel chains for the model in jags.model function
-#' @param n.adapt the number of iterations for adaptation in jags.model function
-#' @param n.iter.update number of iterations in update function
-#' @param n.iter.coda number of iterations in coda.samples function
+#' @param n.chain An integer specifying the number of parallel chains for the model in jags.model function
+#' @param n.adapt An integer specifying the number of iterations for adaptation in jags.model function
+#' @param n.iter.update An integer specifying number of iterations in update function
+#' @param n.iter.coda An integer specifying the number of iterations in coda.samples function
+#' @param standardized Logical. If TRUE, uses standardized exposures
+#' @param q An integer specifying the number of quantile groups
 #' @return A data frame containing results of the Bayesian analysis.
 
 
@@ -26,7 +28,9 @@ BaZING_Model <- function(formatted_data,
                          n.chains = 3,
                          n.adapt = 100,
                          n.iter.update = 2,
-                         n.iter.coda = 2) {
+                         n.iter.coda = 2,
+                         standardized = FALSE,
+                         q = 4) {
 
   #Extract metaddata file from formatted data
   Object <- data.frame(formatted_data$Table)
@@ -38,9 +42,18 @@ BaZING_Model <- function(formatted_data,
 
   #Create exposure dataframe
   X <- Object[x]
-  X.q <- apply(X, 2, function(v) { cut(v, breaks=quantile(v, probs=c(0, 0.25, 0.5, 0.75, 1)), include.lowest=TRUE, labels=FALSE) })
-  P <- ncol(X.q)
-  profiles <- rbind(rep(-0.5,P), rep(0.5, P))
+  P <- ncol(X)
+
+  if(standardized) {
+    X.q <- scale(X)
+    profiles <- rbind(rep(0, P), rep(1, P))
+  }else{
+    probs <- seq(0, 1, length.out = q + 1)
+    X.q <- apply(X, 2, function(v) {
+      cut(v, breaks = quantile(v, probs = probs, include.lowest = TRUE), labels = FALSE)
+    }
+    profiles <- rbind(rep(-0.5, P), rep(0.5, P)))
+  }
 
   #Create outcome dataframe
   Y <- Object[, grep("k__", names(Object))]
