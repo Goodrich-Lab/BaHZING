@@ -19,6 +19,7 @@
 #' @param n.iter.update An integer specifying number of iterations in update function
 #' @param n.iter.coda An integer specifying the number of iterations in coda.samples function
 #' @param standardized Logical. If TRUE, uses standardized exposures
+#' @param counterfactual_profiles A 2xP matrix or a vector with length of 2; P is the column number of exposure dataframe.
 #' @param q An integer specifying the number of quantile groups
 #' @return A data frame containing results of the Bayesian analysis.
 
@@ -30,6 +31,7 @@ BaZING_Model <- function(formatted_data,
                          n.iter.update = 2,
                          n.iter.coda = 2,
                          standardized = FALSE,
+                         counterfactual_profiles = c(-0.5, 0.5),
                          q = 4) {
 
   #Extract metaddata file from formatted data
@@ -44,17 +46,32 @@ BaZING_Model <- function(formatted_data,
   X <- Object[x]
   P <- ncol(X)
 
+  if(is.matrix(conterfactual_profiles)){
+    if(nrow(conterfactual_profiles)!=2|ncol(conterfactual_profiles)!=P){
+      "Counterfactural Profiles should be a 2xP matrix or a vector with length 2"
+    }else{
+      profiles = conterfactual_profiles
+    }
+  }else{
+    if(length(conterfactual_profiles) != 2){
+      "Counterfactural Profiles should be a 2xP matrix or a vector with length 2"
+    }
+    if(standardized) {
+      counterfactual_profiles = c(0, 1)
+    }
+    profiles <- rbind(rep(counterfactual_profiles[1], P), rep(counterfactual_profiles[2], P))
+  }
+
   if(standardized) {
     X.q <- scale(X)
-    profiles <- rbind(rep(0, P), rep(1, P))
   }else{
     probs <- seq(0, 1, length.out = q + 1)
     X.q <- apply(X, 2, function(v) {
       cut(v, breaks = quantile(v, probs = probs, include.lowest = TRUE), labels = FALSE)
-    }
-    profiles <- rbind(rep(-0.5, P), rep(0.5, P)))
+    })
   }
 
+  # Create profiles matrix
   #Create outcome dataframe
   Y <- Object[, grep("k__", names(Object))]
   N <- nrow(Y)
