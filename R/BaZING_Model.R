@@ -6,7 +6,6 @@
 #' @import rjags
 #' @import pscl
 #' @import ggplot2
-#' @import qgcomp
 #' @import dplyr
 #' @import tidyr
 #' @import phyloseq
