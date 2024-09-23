@@ -71,7 +71,6 @@ BaZING_Model <- function(formatted_data,
     })
   }
 
-  # Create profiles matrix
   #Create outcome dataframe
   Y <- Object[, grep("k__", names(Object))]
   N <- nrow(Y)
