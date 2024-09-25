@@ -1,7 +1,7 @@
 ## code to prepare `iHMP microbiome and diet` dataset
 library(phyloseq)
 library(readr)
-library(tidyverse )
+library(tidyverse)
 
 Sys.setenv("VROOM_CONNECTION_SIZE" = 10000000)
 
@@ -100,7 +100,27 @@ diet_dat_fct <- metadata |>
 #   geom_histogram() +
 #   facet_wrap(.~cols)
 
-# 2. Get taxa, otu, and sample tables ----------
+# 2. Covariates ---------
+
+## a. Connvert categorical variables to indicator variables
+metadata <- metadata %>%
+  mutate(sex=ifelse(sex=="Female",0,1)) %>%
+  mutate(race0=ifelse(race=="White",1,0),
+         race1=ifelse(race=="Black or African American",1,0),
+         race2=ifelse(race=="American Indian or Alaska Native",1,0),
+         race3=ifelse(race=="More than one race",1,0)) %>%
+  mutate(educ0=ifelse(education_level=="7th grade or less",1,0),
+         educ1=ifelse(education_level=="Some high school",1,0),
+         educ2=ifelse(education_level=="High school graduate or GED",1,0),
+         educ3=ifelse(education_level=="Some college, no degree",1,0),
+         educ4=ifelse(education_level=="Bachelor's degree",1,0),
+         educ5=ifelse(education_level=="Master's degree",1,0),
+         educ6=ifelse(education_level=="Professional/Doctoral degree",1,0),
+         educ7=ifelse(education_level=="Unknown/Not Reported",1,0))
+
+
+
+# 3. Get taxa, otu, and sample tables ----------
 
 ## a. Get otu table --------
 otumat <- ihmp_species |>
