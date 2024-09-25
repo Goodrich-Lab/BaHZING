@@ -33,7 +33,7 @@
 #' @name BHMRmicrobiome
 
 
-Format_BaZING <- function(phyloseq.object) {
+Format_BaHZING <- function(phyloseq.object) {
   # Initialize variables to store taxonomic levels and ASV information
   Kingdom <- NULL    # Variable to store Kingdom taxonomic level
   Phylum <- NULL     # Variable to store Phylum taxonomic level
@@ -68,10 +68,20 @@ Format_BaZING <- function(phyloseq.object) {
   if ("Kingdom" %in% colnames(taxa.table)) {
     # If 'Kingdom' column is present in the taxonomic table, add 'k__' prefix
     taxa.table <- taxa.table %>%
-      mutate(Kingdom=paste0("k__", Kingdom))
+      mutate(Kingdom=ifelse(grepl("k__",Kingdom),Kingdom,paste0("k__", Kingdom)))
     # taxa.table <- taxa.table %>%
     #   mutate(Kingdom=ifelse(grepl("k__NA",Kingdom),NA,Kingdom))
   }
+
+  if ("Domain" %in% colnames(taxa.table)) {
+    # If 'Kingdom' column is present in the taxonomic table, add 'k__' prefix
+    taxa.table <- taxa.table %>%
+      rename(Kingdom=Domain)%>%
+      mutate(Kingdom=case_when(grepl("d__",Kingdom) ~ str_replace(Kingdom,"d__","k__"),
+                               grepl("k__",Kingdom) ~ Kingdom,
+                               !grepl("d__",Kingdom) & !grepl("k__",Kingdom) ~ paste0("k__", Kingdom)))
+  }
+
   #If missing kingdom level information, stop and produce error message
   if ("k__NA" %in% taxa.table$Kingdom) {
     stop("Missing Kindom-level information for an ASV/OTU. Remove unidentified bacteria and rerun.")
@@ -80,7 +90,7 @@ Format_BaZING <- function(phyloseq.object) {
   if ("Phylum" %in% colnames(taxa.table)) {
     # If 'Phylum' column is present in the taxonomic table, add 'p__' prefix
     taxa.table <- taxa.table %>%
-      mutate(Phylum=paste0("p__", Phylum))
+      mutate(Phylum=ifelse(grepl("p__",Phylum),Phylum,paste0("p__", Phylum)))
     taxa.table <- taxa.table %>%
       mutate(Phylum=ifelse(grepl("p__NA",Phylum),NA,Phylum))
   }
@@ -88,7 +98,7 @@ Format_BaZING <- function(phyloseq.object) {
   if ("Class" %in% colnames(taxa.table)) {
     # If 'Class' column is present in the taxonomic table, add 'c__' prefix
     taxa.table <- taxa.table %>%
-      mutate(Class=paste0("c__", Class))
+      mutate(Class=ifelse(grepl("c__",Class),Class,paste0("c__", Class)))
     taxa.table <-taxa.table %>%
       mutate(Class=ifelse(grepl("c__NA",Class),NA,Class))
   }
@@ -96,7 +106,7 @@ Format_BaZING <- function(phyloseq.object) {
   if ("Order" %in% colnames(taxa.table)) {
     # If 'Order' column is present in the taxonomic table, add 'o__' prefix
     taxa.table <- taxa.table %>%
-      mutate(Order=paste0("o__", Order))
+      mutate(Order=ifelse(grepl("o__",Order),Order,paste0("o__", Order)))
     taxa.table <-taxa.table %>%
       mutate(Order=ifelse(grepl("o__NA",Order),NA,Order))
   }
@@ -104,7 +114,7 @@ Format_BaZING <- function(phyloseq.object) {
   if ("Family" %in% colnames(taxa.table)) {
     # If 'Family' column is present in the taxonomic table, add 'f__' prefix
     taxa.table <- taxa.table %>%
-      mutate(Family=paste0("f__", Family))
+      mutate(Family=ifelse(grepl("f__",Family),Family,paste0("f__", Family)))
     taxa.table <-taxa.table %>%
       mutate(Family=ifelse(grepl("f__NA",Family),NA,Family))
   }
@@ -112,7 +122,7 @@ Format_BaZING <- function(phyloseq.object) {
   if ("Genus" %in% colnames(taxa.table)) {
     # If 'Genus' column is present in the taxonomic table, add 'g__' prefix
     taxa.table <- taxa.table %>%
-      mutate(Genus=paste0("g__", Genus))
+      mutate(Genus=ifelse(grepl("g__",Genus),Genus,paste0("g__", Genus)))
     taxa.table <-taxa.table %>%
       mutate(Genus=ifelse(grepl("g__NA",Genus),NA,Genus))
   }
@@ -120,7 +130,7 @@ Format_BaZING <- function(phyloseq.object) {
   if ("Species" %in% colnames(taxa.table)) {
     # If 'Species' column is present in the taxonomic table, add 's__' prefix
     taxa.table <- taxa.table %>%
-      mutate(Species=paste0("s__", Species))
+      mutate(Species=ifelse(grepl("s__",Species),Species,paste0("s__", Species)))
     taxa.table <- taxa.table %>%
       mutate(Species=ifelse(grepl("s__NA",Species),NA,Species))
   }

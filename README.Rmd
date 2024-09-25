@@ -54,7 +54,7 @@ library(BaZING)
 # Load example data
 data("iHMP")
 
-
+object <- Format_BaHZING(iHMP)
 ```
 
 
