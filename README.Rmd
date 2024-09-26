@@ -13,7 +13,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-# BaZING
+# BaZING: Bayesian Hierarchical Zero-Inflated Negative Binomial Regression with G-Computation
 
 <!-- badges: start -->
 [![Codecov test coverage](https://codecov.io/gh/Goodrich-Lab/BaZING/branch/main/graph/badge.svg)](https://app.codecov.io/gh/Goodrich-Lab/BaZING?branch=main)
@@ -30,7 +30,7 @@ knitr::opts_chunk$set(
 
 ## Overview
 
-The goal of BaZING is to ...
+This platform is dedicated to the analysis of environmental mixture exposures and other mixture exposures with hierarchical gut microbiome outcome data. BaZING, short for Bayesian Hierarchical Zero-Inflated Negative Binomial Regression with G-Computation, is a powerful toolkit designed to uncover intricate relationships between environmental exposures and gut microbiome outcomes.
 
 
 ## Installation
@@ -45,16 +45,41 @@ pak::pak("Goodrich-Lab/BaZING")
 
 ## Example
 
-The following example comes from the data in ... 
+The following example comes from the data in iHMP publically available dataset 
 
 
 ```{r example}
-library(BaZING)
+library(BaHZING)
 
-# Load example data
-data("iHMP")
+### Load example data
+data("iHMP_Reduced")
 
-object <- Format_BaHZING(iHMP)
+### Format microbiome data
+formatted_data <- Format_BaHZING(iHMP_Reduced)
+
+### Perform Bayesian hierarchical zero-inflated negative binomial regression with g-computation
+### Specify a mixture of exposures
+x <- c("soft_drinks_dietnum","diet_soft_drinks_dietnum","fruit_juice_dietnum","water_dietnum",
+       "alcohol_dietnum","yogurt_dietnum","dairy_dietnum","probiotic_dietnum","fruits_no_juice_dietnum",
+       "vegetables_dietnum","beans_soy_dietnum","whole_grains_dietnum","starch_dietnum","eggs_dietnum",
+       "processed_meat_dietnum","red_meat_dietnum","white_meat_dietnum","shellfish_dietnum","fish_dietnum",
+       "sweets_dietnum")
+
+### Specify a set of covariates
+covar <- c("consent_age","sex",paste0("race",0:3),paste0("educ",0:7))
+
+
+### Define counterfactuals based on a low and high exposure level in your data
+counterfactual_profiles <- c(1,5) #1 serving to 5 servings
+
+### If mixtures are not standardized, set to false 
+standardized = FALSE
+
+### If want to compare to results of qgcomp, set to true. If not, set to false
+quantiles = FALSE
+
+### Perform BaH-ZING 
+results <- BaZING_Model(formatted_data,covar,x,counterfactual_profiles,standardized,quantiles)
 ```
 
 

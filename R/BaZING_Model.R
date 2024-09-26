@@ -26,13 +26,17 @@
 
 BaZING_Model <- function(formatted_data,
                          covar,x,
+                         counterfactual_profiles,
+                         standardized,
+                         quantiles,
                          n.chains = 3,
                          n.adapt = 100,
                          n.iter.update = 2,
                          n.iter.coda = 2,
-                         standardized = FALSE,
-                         counterfactual_profiles = c(-0.5, 0.5),
+                         # standardized = FALSE,
+                         # counterfactual_profiles = c(-0.5, 0.5),
                          q = 4) {
+
 
   #Extract metaddata file from formatted data
   Object <- data.frame(formatted_data$Table)
@@ -46,14 +50,14 @@ BaZING_Model <- function(formatted_data,
   X <- Object[x]
   P <- ncol(X)
 
-  if(is.matrix(conterfactual_profiles)){
-    if(nrow(conterfactual_profiles)!=2|ncol(conterfactual_profiles)!=P){
+  if(is.matrix(counterfactual_profiles)){
+    if(nrow(counterfactual_profiles)!=2|ncol(counterfactual_profiles)!=P){
       "Counterfactural Profiles should be a 2xP matrix or a vector with length 2"
     }else{
-      profiles = conterfactual_profiles
+      profiles = counterfactual_profiles
     }
   }else{
-    if(length(conterfactual_profiles) != 2){
+    if(length(counterfactual_profiles) != 2){
       "Counterfactural Profiles should be a 2xP matrix or a vector with length 2"
     }
     if(standardized) {
@@ -62,13 +66,19 @@ BaZING_Model <- function(formatted_data,
     profiles <- rbind(rep(counterfactual_profiles[1], P), rep(counterfactual_profiles[2], P))
   }
 
-  if(standardized) {
-    X.q <- scale(X)
-  }else{
+  #If quantiles specified as true, quantize X
+  if (quantiles) {
     probs <- seq(0, 1, length.out = q + 1)
     X.q <- apply(X, 2, function(v) {
       cut(v, breaks = quantile(v, probs = probs, include.lowest = TRUE), labels = FALSE)
     })
+  }
+
+  #If not quantized and not standardized, scale X
+  if(!quantiles & !standardized) {
+    X.q <- scale(X)
+  } else {
+    X.q <- X
   }
 
   # Create profiles matrix
@@ -310,16 +320,16 @@ BaZING_Model <- function(formatted_data,
   family <- colnames(FamilyData)
   genus <- colnames(GenusData)
   species <- colnames(Y)
-  pfas <- colnames(X)
+  Exposure <- colnames(X)
   results$Taxa.Index <- str_remove(rownames(results),"..*\\[")
   results$Taxa.Index <- str_remove(results$Taxa.Index,",.*$")
   results$Taxa.Index <- str_remove(results$Taxa.Index,"]")
   results$Taxa.Index <- as.numeric(results$Taxa.Index)
-  results$PFAS.Index <- str_remove(rownames(results),"..*\\,")
+  results$Exposure.Index <- str_remove(rownames(results),"..*\\,")
   results <- results %>%
-    mutate(PFAS.Index=ifelse(grepl("disp",PFAS.Index)|grepl("omega",PFAS.Index)|grepl("psi",PFAS.Index),NA,PFAS.Index))
-  results$PFAS.Index <- str_remove(results$PFAS.Index,"]")
-  results$PFAS.Index <- as.numeric(results$PFAS.Index)
+    mutate(Exposure.Index=ifelse(grepl("disp",Exposure.Index)|grepl("omega",Exposure.Index)|grepl("psi",Exposure.Index),NA,Exposure.Index))
+  results$Exposure.Index <- str_remove(results$Exposure.Index,"]")
+  results$Exposure.Index <- as.numeric(results$Exposure.Index)
 
   results <- results %>%
     mutate(Taxa=case_when(grepl("phylum",rownames(results)) ~ paste0(phylum[Taxa.Index]),
@@ -328,20 +338,20 @@ BaZING_Model <- function(formatted_data,
                           grepl("family",rownames(results)) ~ paste0(family[Taxa.Index]),
                           grepl("genus",rownames(results)) ~ paste0(genus[Taxa.Index]),
                           grepl("species",rownames(results)) ~ paste0(species[Taxa.Index])),
-           PFAS=paste0(pfas[PFAS.Index]))
+           Exposure=paste0(Exposure[Exposure.Index]))
   results <- results %>%
     mutate(Component=ifelse(grepl("zero",rownames(results)),"Means","Probability"))
 
   results <- results %>%
-    mutate(PFAS=ifelse(grepl("disp",rownames(results)),paste0("Dispersion"),
-                       ifelse(grepl("omega",rownames(results)),paste0("Omega"),PFAS)))
+    mutate(Exposure=ifelse(grepl("disp",rownames(results)),paste0("Dispersion"),
+                       ifelse(grepl("omega",rownames(results)),paste0("Omega"),Exposure)))
   results <- results %>%
-    mutate(PFAS=ifelse(grepl("psi",rownames(results)),"Mixture",PFAS))
+    mutate(Exposure=ifelse(grepl("psi",rownames(results)),"Mixture",Exposure))
   results <- results %>%
     mutate(Taxa=ifelse(grepl("disp",rownames(results)),paste0(species[Taxa.Index]),Taxa),
            Taxa=ifelse(grepl("omega",rownames(results)),paste0(species[Taxa.Index]),Taxa))
   results <- results %>%
-    select(Taxa,PFAS,Component,OR,OR.ll,OR.ul,sig)
+    select(Taxa,Exposure,Component,OR,OR.ll,OR.ul,sig)
 
   return(results)
 }
