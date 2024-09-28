@@ -25,19 +25,20 @@
 
 
 BaZING_Model <- function(formatted_data,
-                         covar,x,
-                         counterfactual_profiles,
-                         standardized,
-                         quantiles,
+                         covar,
+                         x,
+                         exposure_standardization,
                          n.chains = 3,
                          n.adapt = 100,
                          n.iter.update = 2,
                          n.iter.coda = 2,
                          # standardized = FALSE,
-                         # counterfactual_profiles = c(-0.5, 0.5),
+                         counterfactual_profiles = c(-0.5, 0.5),
                          q = 4) {
 
 
+  #Set default counterfactual profiles
+  default <- c(-0.5,0.5)
   #Extract metaddata file from formatted data
   Object <- data.frame(formatted_data$Table)
 
@@ -60,14 +61,18 @@ BaZING_Model <- function(formatted_data,
     if(length(counterfactual_profiles) != 2){
       "Counterfactural Profiles should be a 2xP matrix or a vector with length 2"
     }
-    if(standardized) {
+    if(exposure_standardization=="quantiles" & all(counterfactual_profiles==default)){
       counterfactual_profiles = c(0, 1)
     }
     profiles <- rbind(rep(counterfactual_profiles[1], P), rep(counterfactual_profiles[2], P))
   }
 
+  if(!(exposure_standardization %in% c("standard_normal", "quantile"))){
+    stop("exposure_standardization must be either standard_normal or quantile")
+  }
+
   #If quantiles specified as true, quantize X
-  if (quantiles) {
+  if (exposure_standardization=="quantile") {
     probs <- seq(0, 1, length.out = q + 1)
     X.q <- apply(X, 2, function(v) {
       cut(v, breaks = quantile(v, probs = probs, include.lowest = TRUE), labels = FALSE)
@@ -75,10 +80,10 @@ BaZING_Model <- function(formatted_data,
   }
 
   #If not quantized and not standardized, scale X
-  if(!quantiles & !standardized) {
+  if(exposure_standardization=="standard_normal") {
     X.q <- scale(X)
-  } else {
-    X.q <- X
+  # } else {
+  #   X.q <- X
   }
 
   # Create profiles matrix

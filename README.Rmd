@@ -49,7 +49,7 @@ The following example comes from the data in iHMP publically available dataset
 
 
 ```{r example}
-library(BaHZING)
+library(BaZING)
 
 ### Load example data
 data("iHMP_Reduced")
@@ -68,18 +68,11 @@ x <- c("soft_drinks_dietnum","diet_soft_drinks_dietnum","fruit_juice_dietnum","w
 ### Specify a set of covariates
 covar <- c("consent_age","sex",paste0("race",0:3),paste0("educ",0:7))
 
-
-### Define counterfactuals based on a low and high exposure level in your data
-counterfactual_profiles <- c(1,5) #1 serving to 5 servings
-
-### If mixtures are not standardized, set to false 
-standardized = FALSE
-
-### If want to compare to results of qgcomp, set to true. If not, set to false
-quantiles = FALSE
+###Set exposure standaridization to standard_normal or quantiles
+exposure_standardization = "standard_normal"
 
 ### Perform BaH-ZING 
-results <- BaZING_Model(formatted_data,covar,x,counterfactual_profiles,standardized,quantiles)
+results <- BaZING_Model(formatted_data,covar,x,exposure_standardization)
 ```
 
 
