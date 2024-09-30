@@ -42,10 +42,18 @@ You can install the development version of BaZING from [GitHub](https://github.c
 pak::pak("Goodrich-Lab/BaZING")
 ```
 
+## Input Requirements
+BaZING's formatting function requires a phyloseq object as the input. Ensure that your phyloseq object adheres to the required format. Refer to the phyloseq documentation for details on creating and manipulating phyloseq objects. 
+For covariates in phyloseq object: All categorical covariates must be formatted as binary indicator variables rather than categorical or factor variables. 
+For missing data: Ensure that there are no NA values in your data, perform the necessary filtering or imputation methods necessary to handle these values as BaHZING cannot function with missing data. 
+
+## Output
+The formatting function produces an object that contains a table with all exposure variables, all covariates and the lowest level of microbiome outcome data. Additionally, the function produces binary matrices that represent the relationship between each level of microbiome data and the level above it.
+
+The BaZING model function provides results from the Bayesian hierarchical zero-inflated negative binomial regression model.
 
 ## Example
-
-The following example comes from the data in iHMP publically available dataset 
+For a quick start, we utilize data from the iHMP publicly available data set. This example will guide you through the process of using BaZING for analyzing environmental mixture exposures with hierarchical gut microbiome outcome data.
 
 
 ```{r example}
@@ -74,8 +82,6 @@ exposure_standardization = "standard_normal"
 ### Perform BaH-ZING 
 results <- BaZING_Model(formatted_data,covar,x,exposure_standardization)
 ```
-
-
 
 
 
