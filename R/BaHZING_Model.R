@@ -1,5 +1,5 @@
-#' BaZING_Model Function
-#' This function implements the BaZING model for microbiome data analysis.
+#' BaHZING_Model Function
+#' This function implements the BaHZING model for microbiome data analysis.
 #'
 #' Load Packages
 #' @import R2jags
@@ -24,7 +24,7 @@
 #' @return A data frame containing results of the Bayesian analysis.
 
 
-BaZING_Model <- function(formatted_data,
+BaHZING_Model <- function(formatted_data,
                          covar,
                          x,
                          exposure_standardization,

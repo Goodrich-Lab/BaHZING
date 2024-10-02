@@ -13,10 +13,10 @@ knitr::opts_chunk$set(
 )
 ```
 
-# BaZING: Bayesian Hierarchical Zero-Inflated Negative Binomial Regression with G-Computation
+# BaHZING: Bayesian Hierarchical Zero-Inflated Negative Binomial Regression with G-Computation
 
 <!-- badges: start -->
-[![Codecov test coverage](https://codecov.io/gh/Goodrich-Lab/BaZING/branch/main/graph/badge.svg)](https://app.codecov.io/gh/Goodrich-Lab/BaZING?branch=main)
+[![Codecov test coverage](https://codecov.io/gh/Goodrich-Lab/BaHZING/branch/main/graph/badge.svg)](https://app.codecov.io/gh/Goodrich-Lab/BaHZING?branch=main)
 <!-- badges: end -->
 
 
@@ -35,29 +35,29 @@ This platform is dedicated to the analysis of environmental mixture exposures an
 
 ## Installation
 
-You can install the development version of BaZING from [GitHub](https://github.com/) with:
+You can install the development version of BaHZING from [GitHub](https://github.com/) with:
 
 ``` r
 # install.packages("pak")
-pak::pak("Goodrich-Lab/BaZING")
+pak::pak("Goodrich-Lab/BaHZING")
 ```
 
 ## Input Requirements
-BaZING's formatting function requires a phyloseq object as the input. Ensure that your phyloseq object adheres to the required format. Refer to the phyloseq documentation for details on creating and manipulating phyloseq objects. 
+BaHZING's formatting function requires a phyloseq object as the input. Ensure that your phyloseq object adheres to the required format. Refer to the phyloseq documentation for details on creating and manipulating phyloseq objects. 
 For covariates in phyloseq object: All categorical covariates must be formatted as binary indicator variables rather than categorical or factor variables. 
 For missing data: Ensure that there are no NA values in your data, perform the necessary filtering or imputation methods necessary to handle these values as BaHZING cannot function with missing data. 
 
 ## Output
 The formatting function produces an object that contains a table with all exposure variables, all covariates and the lowest level of microbiome outcome data. Additionally, the function produces binary matrices that represent the relationship between each level of microbiome data and the level above it.
 
-The BaZING model function provides results from the Bayesian hierarchical zero-inflated negative binomial regression model.
+The BaHZING model function provides results from the Bayesian hierarchical zero-inflated negative binomial regression model.
 
 ## Example
 For a quick start, we utilize data from the iHMP publicly available data set. This example will guide you through the process of using BaZING for analyzing environmental mixture exposures with hierarchical gut microbiome outcome data.
 
 
 ```{r example}
-library(BaZING)
+library(BaHZING)
 
 ### Load example data
 data("iHMP_Reduced")
@@ -80,7 +80,7 @@ covar <- c("consent_age","sex",paste0("race",0:3),paste0("educ",0:7))
 exposure_standardization = "standard_normal"
 
 ### Perform BaH-ZING 
-results <- BaZING_Model(formatted_data,covar,x,exposure_standardization)
+results <- BaHZING_Model(formatted_data,covar,x,exposure_standardization)
 ```
 
 
