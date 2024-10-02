@@ -33,11 +33,8 @@ jobs:
           install.packages('pscl')  # Install pscl (or any other missing package)
         shell: Rscript {0}
         
-      - name: Install LaTeX
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y texlive texlive-latex-extra texlive-fonts-recommended
-          sudo apt-get install -y fonts-inconsolata
+      - name: Update LaTeX packages
+        run: sudo apt-get install -y texlive-full
         
       - name: Run R CMD check
         run: |
