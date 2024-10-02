@@ -1,12 +1,12 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# BaZING
+# BaHZING
 
 <!-- badges: start -->
 
 [![Codecov test
-coverage](https://codecov.io/gh/Goodrich-Lab/BaZING/branch/main/graph/badge.svg)](https://app.codecov.io/gh/Goodrich-Lab/BaZING?branch=main)
+coverage](https://codecov.io/gh/Goodrich-Lab/BaHZING/branch/main/graph/badge.svg)](https://app.codecov.io/gh/Goodrich-Lab/BaHZING?branch=main)
 <!-- badges: end -->
 
 ## Contents
@@ -17,16 +17,16 @@ coverage](https://codecov.io/gh/Goodrich-Lab/BaZING/branch/main/graph/badge.svg)
 
 ## Overview
 
-The goal of BaZING is to …
+The goal of BaHZING is to …
 
 ## Installation
 
-You can install the development version of BaZING from
+You can install the development version of BaHZING from
 [GitHub](https://github.com/) with:
 
 ``` r
 # install.packages("pak")
-pak::pak("Goodrich-Lab/BaZING")
+pak::pak("Goodrich-Lab/BaHZING")
 ```
 
 ## Example
@@ -34,7 +34,7 @@ pak::pak("Goodrich-Lab/BaZING")
 The following example comes from the data in …
 
 ``` r
-library(BaZING)
+library(BaHZING)
 
 # Load example data
 data("iHMP")

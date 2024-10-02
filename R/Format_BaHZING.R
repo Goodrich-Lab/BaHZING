@@ -1,4 +1,4 @@
-#' Format_BaZING Function
+#' Format_BaHZING Function
 #'
 #' This function takes a phyloseq object and performs formatting operations on it,
 #' including modifying the taxonomic table, uniting taxonomic levels, and creating

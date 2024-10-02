@@ -7,6 +7,6 @@
 # * https://testthat.r-lib.org/articles/special-files.html
 
 library(testthat)
-library(BaZING)
+library(BaHZING)
 
-test_check("BaZING")
+test_check("BaHZING")
