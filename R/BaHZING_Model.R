@@ -10,19 +10,27 @@
 #' @import tidyr
 #' @import phyloseq
 #' @import stringr
+#' @importFrom stats quantile update
 
 #' @param formatted_data An object containing formatted microbiome data.
 #' @param covar A vector of covariates.
 #' @param x A vector of exposures.
-#' @param n.chain An integer specifying the number of parallel chains for the model in jags.model function
+#' @param n.chains An integer specifying the number of parallel chains for the model in jags.model function
 #' @param n.adapt An integer specifying the number of iterations for adaptation in jags.model function
 #' @param n.iter.update An integer specifying number of iterations in update function
 #' @param n.iter.coda An integer specifying the number of iterations in coda.samples function
-#' @param standardized Logical. If TRUE, uses standardized exposures
+#' @param exposure_standardization "standard_normal" or "quantile"
 #' @param counterfactual_profiles A 2xP matrix or a vector with length of 2; P is the column number of exposure dataframe.
 #' @param q An integer specifying the number of quantile groups
 #' @return A data frame containing results of the Bayesian analysis.
 
+#' @export
+#' @name BaHZING_Model
+
+# Declare global variables
+utils::globalVariables(c("LibrarySize", "X2.5.", "X97.5.", "Mean",
+                         "Exposure.Index", "Taxa.Index", "Taxa",
+                         "Component", "OR", "OR.ll", "OR.ul", "sig", "Domain"))
 
 BaHZING_Model <- function(formatted_data,
                          covar,
@@ -36,6 +44,9 @@ BaHZING_Model <- function(formatted_data,
                          counterfactual_profiles = c(-0.5, 0.5),
                          q = 4) {
 
+  if(is.null(covar)){
+    "BaHZING method does not currently support analysis without covariates"
+  }
 
   #Set default counterfactual profiles
   default <- c(-0.5,0.5)
