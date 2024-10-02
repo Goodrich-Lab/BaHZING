@@ -3,7 +3,7 @@ Title: BaHZING: Bayesian Hierarchical Zero-Inflated Negative Binomial Regression
 Version: 1.1.0
 Authors@R: 
     person("Hailey", "Hampson", , "hhampson@usc.edu", role = c("aut", "cre"),
-         comment = c(ORCID = "YOUR-ORCID-ID"))
+          comment = c(ORCID = "YOUR-ORCID-ID"))
     person("Jesse", "Goodrich", , "jagoodri@usc.edu", role = c("aut"))
     person("Hongxu", "Wang", ,  "hongxuwa@usc.edu", role = c("aut"))
     person("David", "Conti", , "dconti@usc.edu", role = c("aut", "cre"))
