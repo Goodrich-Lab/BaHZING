@@ -30,7 +30,7 @@ knitr::opts_chunk$set(
 
 ## Overview
 
-This platform is dedicated to the analysis of environmental mixture exposures and other mixture exposures with hierarchical gut microbiome outcome data. BaZING, short for Bayesian Hierarchical Zero-Inflated Negative Binomial Regression with G-Computation, is a powerful toolkit designed to uncover intricate relationships between environmental exposures and gut microbiome outcomes.
+This platform is dedicated to the analysis of environmental mixture exposures and other mixture exposures with hierarchical gut microbiome outcome data. BaHZING, short for Bayesian Hierarchical Zero-Inflated Negative Binomial Regression with G-Computation, is a powerful toolkit designed to uncover intricate relationships between environmental exposures and gut microbiome outcomes.
 
 
 ## Installation
@@ -53,7 +53,7 @@ The formatting function produces an object that contains a table with all exposu
 The BaHZING model function provides results from the Bayesian hierarchical zero-inflated negative binomial regression model.
 
 ## Example
-For a quick start, we utilize data from the iHMP publicly available data set. This example will guide you through the process of using BaZING for analyzing environmental mixture exposures with hierarchical gut microbiome outcome data.
+For a quick start, we utilize data from the iHMP publicly available data set. This example will guide you through the process of using BaHZING for analyzing environmental mixture exposures with hierarchical gut microbiome outcome data.
 
 
 ```{r example}
