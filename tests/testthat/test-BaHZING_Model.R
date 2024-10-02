@@ -18,22 +18,20 @@ test_that("test BaHZING_Model", {
 
   ### Specify a set of covariates
   # covar <- c("consent_age","sex",paste0("race",0:3),paste0("educ",0:7))
-
   covar <- c("consent_age")
 
   ###Set exposure standaridization to standard_normal or quantiles
   exposure_standardization = "standard_normal"
-
-  n.chains = 1
-  n.adapt = 60
 
   ### Perform BaH-ZING
   results <- BaHZING_Model(formatted_data,
                            covar,
                            x,
                            exposure_standardization,
-                           n.chains,
-                           n.adapt)
+                           n.chains = 1,
+                           n.adapt = 60,
+                           n.burnin = 2,
+                           n.sample = 2)
   # Test format data
   testthat::expect_equal(object = ncol(results), expected = 7)
 })

@@ -17,8 +17,8 @@
 #' @param x A vector of exposures.
 #' @param n.chains An integer specifying the number of parallel chains for the model in jags.model function
 #' @param n.adapt An integer specifying the number of iterations for adaptation in jags.model function
-#' @param n.iter.update An integer specifying number of iterations in update function
-#' @param n.iter.coda An integer specifying the number of iterations in coda.samples function
+#' @param n.burnin An integer specifying number of iterations in update function
+#' @param n.sample An integer specifying the number of iterations in coda.samples function
 #' @param exposure_standardization "standard_normal" or "quantile"
 #' @param counterfactual_profiles A 2xP matrix or a vector with length of 2; P is the column number of exposure dataframe.
 #' @param q An integer specifying the number of quantile groups
@@ -38,8 +38,8 @@ BaHZING_Model <- function(formatted_data,
                          exposure_standardization,
                          n.chains = 3,
                          n.adapt = 5000,
-                         n.iter.update = 2,
-                         n.iter.coda = 2,
+                         n.burnin = 2,
+                         n.sample = 2,
                          # standardized = FALSE,
                          counterfactual_profiles = c(-0.5, 0.5),
                          q = 4) {
@@ -316,8 +316,8 @@ BaHZING_Model <- function(formatted_data,
   # update(model.fit, n.iter=10, progress.bar="text")
   # model.fit <- coda.samples(model=model.fit, variable.names=var.s, n.iter=50, thin=1, progress.bar="text")
   model.fit <- jags.model(file=textConnection(BHRM.microbiome), data=jdata, n.chains=n.chains, n.adapt=n.adapt, quiet=F)
-  update(model.fit, n.iter=n.iter.update, progress.bar="text")
-  model.fit <- coda.samples(model=model.fit, variable.names=var.s, n.iter=n.iter.coda, thin=1, progress.bar="text")
+  update(model.fit, n.iter=n.burnin, progress.bar="text")
+  model.fit <- coda.samples(model=model.fit, variable.names=var.s, n.iter=n.sample, thin=1, progress.bar="text")
   # summarize results
   r <- summary(model.fit)
   results <- data.frame(round(r$statistics[,1:2],3), round(r$quantiles[,c(1,5)],3))
