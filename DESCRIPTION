@@ -17,7 +17,8 @@ Imports:
     stringr,
     R2jags,
     ggplot2,
-    pscl
+    pscl,
+    magrittr
 Suggests:
     covr,
     testthat (>= 3.0.0)
