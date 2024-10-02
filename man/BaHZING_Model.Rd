@@ -4,20 +4,6 @@
 \alias{BaHZING_Model}
 \title{BaHZING_Model Function
 This function implements the BaHZING model for microbiome data analysis.}
-\usage{
-BaHZING_Model(
-  formatted_data,
-  covar,
-  x,
-  exposure_standardization,
-  n.chains = 3,
-  n.adapt = 100,
-  n.iter.update = 2,
-  n.iter.coda = 2,
-  counterfactual_profiles = c(-0.5, 0.5),
-  q = 4
-)
-}
 \arguments{
 \item{formatted_data}{An object containing formatted microbiome data.}
 
@@ -25,19 +11,19 @@ BaHZING_Model(
 
 \item{x}{A vector of exposures.}
 
+\item{n.chains}{An integer specifying the number of parallel chains for the model in jags.model function}
+
 \item{n.adapt}{An integer specifying the number of iterations for adaptation in jags.model function}
 
 \item{n.iter.update}{An integer specifying number of iterations in update function}
 
 \item{n.iter.coda}{An integer specifying the number of iterations in coda.samples function}
 
+\item{exposure_standardization}{"standard_normal" or "quantile"}
+
 \item{counterfactual_profiles}{A 2xP matrix or a vector with length of 2; P is the column number of exposure dataframe.}
 
 \item{q}{An integer specifying the number of quantile groups}
-
-\item{n.chain}{An integer specifying the number of parallel chains for the model in jags.model function}
-
-\item{standardized}{Logical. If TRUE, uses standardized exposures}
 }
 \value{
 A data frame containing results of the Bayesian analysis.
