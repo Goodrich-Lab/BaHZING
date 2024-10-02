@@ -34,7 +34,10 @@ jobs:
         shell: Rscript {0}
         
       - name: Install LaTeX
-        run: sudo apt-get install texlive
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y texlive texlive-latex-extra texlive-fonts-recommended
+          sudo apt-get install -y fonts-inconsolata
         
       - name: Run R CMD check
         run: |
