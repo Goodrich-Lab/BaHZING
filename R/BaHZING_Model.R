@@ -32,6 +32,7 @@ utils::globalVariables(c("LibrarySize", "X2.5.", "X97.5.", "Mean",
                          "Exposure.Index", "Taxa.Index", "Taxa",
                          "Component", "OR", "OR.ll", "OR.ul", "sig", "Domain"))
 
+
 BaHZING_Model <- function(formatted_data,
                          covar,
                          x,
