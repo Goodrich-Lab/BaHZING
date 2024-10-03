@@ -17,6 +17,7 @@ knitr::opts_chunk$set(
 
 <!-- badges: start -->
 [![Codecov test coverage](https://codecov.io/gh/Goodrich-Lab/BaHZING/branch/main/graph/badge.svg)](https://app.codecov.io/gh/Goodrich-Lab/BaHZING?branch=main)
+[![R-CMD-check](https://github.com/Goodrich-Lab/BaHZING/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/Goodrich-Lab/BaHZING/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
 
@@ -67,34 +68,30 @@ formatted_data <- Format_BaHZING(iHMP_Reduced)
 
 ### Perform Bayesian hierarchical zero-inflated negative binomial regression with g-computation
 ### Specify a mixture of exposures
-x <- c("soft_drinks_dietnum","diet_soft_drinks_dietnum","fruit_juice_dietnum","water_dietnum",
-       "alcohol_dietnum","yogurt_dietnum","dairy_dietnum","probiotic_dietnum","fruits_no_juice_dietnum",
-       "vegetables_dietnum","beans_soy_dietnum","whole_grains_dietnum","starch_dietnum","eggs_dietnum",
-       "processed_meat_dietnum","red_meat_dietnum","white_meat_dietnum","shellfish_dietnum","fish_dietnum",
-       "sweets_dietnum")
+x <- c("soft_drinks_dietnum","diet_soft_drinks_dietnum")
+# "fruit_juice_dietnum","water_dietnum",
+# "alcohol_dietnum","yogurt_dietnum","dairy_dietnum","probiotic_dietnum",
+# "fruits_no_juice_dietnum", "vegetables_dietnum","beans_soy_dietnum", 
+# "whole_grains_dietnum","starch_dietnum", "eggs_dietnum", 
+# "processed_meat_dietnum","red_meat_dietnum","white_meat_dietnum",
+# "shellfish_dietnum","fish_dietnum", "sweets_dietnum"
 
 ### Specify a set of covariates
-covar <- c("consent_age","sex",paste0("race",0:3),paste0("educ",0:7))
+covar <- c("consent_age")
 
 ###Set exposure standaridization to standard_normal or quantiles
 exposure_standardization = "standard_normal"
 
-### Perform BaH-ZING 
-results <- BaHZING_Model(formatted_data,covar,x,exposure_standardization)
+### Perform BaH-ZING
+# NOTE: For this example, we are using a small number of iterations to reduce 
+# the runtime. For a real analysis, we recommend using n.chain = 3, 
+# n.adapt, n.burnin, and n.sample > 5000.
+results <- BaHZING_Model(formatted_data,
+                         covar,
+                         x,
+                         exposure_standardization,
+                         n.chains = 1,
+                         n.adapt = 60,
+                         n.burnin = 2,
+                         n.sample = 2)
 ```
-
-
-
-
-<!-- delete information below this line before final submission -->
-
-
-You'll still need to render `README.Rmd` regularly, to keep `README.md` up-to-date. `devtools::build_readme()` is handy for this.
-
-You can also embed plots, for example:
-
-```{r pressure, echo = FALSE}
-# plot(pressure)
-```
-
-In that case, don't forget to commit and push the resulting figure files, so they display on GitHub and CRAN.
