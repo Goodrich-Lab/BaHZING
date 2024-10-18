@@ -44,10 +44,6 @@ BaHZING_Model <- function(formatted_data,
                          counterfactual_profiles = c(-0.5, 0.5),
                          q = 4) {
 
-  if(is.null(covar)){
-    "BaHZING method does not currently support analysis without covariates"
-  }
-
   #Set default counterfactual profiles
   default <- c(-0.5,0.5)
   #Extract metaddata file from formatted data
