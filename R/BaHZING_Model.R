@@ -11,14 +11,13 @@
 #' @import phyloseq
 #' @import stringr
 #' @importFrom stats quantile update
-
 #' @param formatted_data An object containing formatted microbiome data.
 #' @param covar A vector of covariates.
 #' @param x A vector of exposures.
 #' @param n.chains An integer specifying the number of parallel chains for the model in jags.model function
 #' @param n.adapt An integer specifying the number of iterations for adaptation in jags.model function
-#' @param n.burnin An integer specifying number of iterations in update function
-#' @param n.sample An integer specifying the number of iterations in coda.samples function
+#' @param n.iter.burnin An integer specifying number of iterations in update function
+#' @param n.iter.sample An integer specifying the number of iterations in coda.samples function
 #' @param exposure_standardization "standard_normal" or "quantile"
 #' @param counterfactual_profiles A 2xP matrix or a vector with length of 2; P is the column number of exposure dataframe.
 #' @param q An integer specifying the number of quantile groups
@@ -38,8 +37,8 @@ BaHZING_Model <- function(formatted_data,
                          exposure_standardization,
                          n.chains = 3,
                          n.adapt = 5000,
-                         n.burnin = 2,
-                         n.sample = 2,
+                         n.iter.burnin = 20000,
+                         n.iter.sample = 20000,
                          # standardized = FALSE,
                          counterfactual_profiles = c(-0.5, 0.5),
                          q = 4) {
@@ -310,12 +309,9 @@ BaHZING_Model <- function(formatted_data,
                 Phylum.R=Phylum.R, PhylumData=PhylumData,
                 profiles=profiles,L=L)
   var.s <- c("species.beta", "genus.beta", "family.beta", "order.beta", "class.beta", "phylum.beta", "species.beta.zero", "genus.beta.zero", "family.beta.zero", "order.beta.zero", "class.beta.zero", "phylum.beta.zero","species.psi","genus.psi","family.psi","order.psi","class.psi","phylum.psi","species.psi.zero","genus.psi.zero","family.psi.zero","order.psi.zero","class.psi.zero","phylum.psi.zero", "omega","disp")
-  # model.fit <- jags.model(file=textConnection(BHRM.microbiome), data=jdata, n.chains=1, n.adapt=100, quiet=F)
-  # update(model.fit, n.iter=10, progress.bar="text")
-  # model.fit <- coda.samples(model=model.fit, variable.names=var.s, n.iter=50, thin=1, progress.bar="text")
   model.fit <- jags.model(file=textConnection(BHRM.microbiome), data=jdata, n.chains=n.chains, n.adapt=n.adapt, quiet=F)
-  update(model.fit, n.iter=n.burnin, progress.bar="text")
-  model.fit <- coda.samples(model=model.fit, variable.names=var.s, n.iter=n.sample, thin=1, progress.bar="text")
+  update(model.fit, n.iter=n.iter.burnin, progress.bar="text")
+  model.fit <- coda.samples(model=model.fit, variable.names=var.s, n.iter=n.iter.sample, thin=1, progress.bar="text")
   # summarize results
   r <- summary(model.fit)
   results <- data.frame(round(r$statistics[,1:2],3), round(r$quantiles[,c(1,5)],3))
@@ -549,12 +545,9 @@ BaHZING_Model <- function(formatted_data,
                   Phylum.R=Phylum.R, PhylumData=PhylumData,
                   profiles=profiles,L=L)
     var.s <- c("species.beta", "genus.beta", "family.beta", "order.beta", "class.beta", "phylum.beta", "species.beta.zero", "genus.beta.zero", "family.beta.zero", "order.beta.zero", "class.beta.zero", "phylum.beta.zero","species.psi","genus.psi","family.psi","order.psi","class.psi","phylum.psi","species.psi.zero","genus.psi.zero","family.psi.zero","order.psi.zero","class.psi.zero","phylum.psi.zero", "omega","disp")
-    # model.fit <- jags.model(file=textConnection(BHRM.microbiome), data=jdata, n.chains=1, n.adapt=100, quiet=F)
-    # update(model.fit, n.iter=10, progress.bar="text")
-    # model.fit <- coda.samples(model=model.fit, variable.names=var.s, n.iter=50, thin=1, progress.bar="text")
     model.fit <- jags.model(file=textConnection(BHRM.microbiome), data=jdata, n.chains=n.chains, n.adapt=n.adapt, quiet=F)
-    update(model.fit, n.iter=n.iter.update, progress.bar="text")
-    model.fit <- coda.samples(model=model.fit, variable.names=var.s, n.iter=n.iter.coda, thin=1, progress.bar="text")
+    update(model.fit, n.iter=n.iter.burnin, progress.bar="text")
+    model.fit <- coda.samples(model=model.fit, variable.names=var.s, n.iter=n.iter.sample, thin=1, progress.bar="text")
     # summarize results
     r <- summary(model.fit)
     results <- data.frame(round(r$statistics[,1:2],3), round(r$quantiles[,c(1,5)],3))
