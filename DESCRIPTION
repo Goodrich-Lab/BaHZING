@@ -1,16 +1,16 @@
 Package: BaHZING
-Title: BaHZING: Bayesian Hierarchical Zero-Inflated Negative Binomial Regression with G-Computation
+Title: Bayesian Hierarchical Zero-Inflated Negative Binomial Regression with G-Computation
 Version: 1.1.0
-Authors@R: 
-    person("Hailey", "Hampson", , "hhampson@usc.edu", role = c("aut", "cre"))
-    person("Jesse", "Goodrich", , "jagoodri@usc.edu", role = c("aut"),
-          comment = c(ORCID = "0000-0001-6615-0472"))
-    person("Hongxu", "Wang", , "hongxuwa@usc.edu", role = c("aut"))
-    person("Tanya", "Alderete", , "taldere1@jhu.edu", role = c("aut"))
-    person("Shardul", "Nazirkar", , "nazirkar@usc.edu", role = c("aut"))
-    person("David", "Conti", , "dconti@usc.edu", role = c("aut", "cre"))
-Description: BaHZING is an analysis tool used for environmental mixture exposures and other mixture exposures with hierarchical gut microbiome outcome data. BaHZING controls Type 1 error rates, multiple testing, stabilizes effect estimates with small sample sizes and Estimated stable effects with a small sample sizes and models the effects of a mixture of PFAS jointly on the gut microbiome.
-License: file LICENSE
+Authors@R: c(
+    person("Hailey", "Hampson", , "hhampson@usc.edu", role = c("aut")),
+    person("Jesse", "Goodrich", , "jagoodri@usc.edu", role = c("aut", "cre"), comment = c(ORCID = "0000-0001-6615-0472")),
+    person("Hongxu", "Wang", , "hongxuwa@usc.edu", role = c("aut")),
+    person("Tanya", "Alderete", , "taldere1@jhu.edu", role = c("ctb")),
+    person("Shardul", "Nazirkar", , "nazirkar@usc.edu", role = c("ctb")),
+    person("David", "Conti", , "dconti@usc.edu", role = c("aut"))
+    )
+Description: Bayesian Hierarchical Zero-Inflated Negative Binomial Regression with G-Computation (BaHZING) is an analysis tool used for environmental mixture exposures and other mixture exposures with hierarchical gut microbiome outcome data. BaHZING controls Type 1 error rates, multiple testing, stabilizes effect estimates with small sample sizes and Estimated stable effects with a small sample sizes and models the effects of a mixture of PFAS jointly on the gut microbiome.
+License: GPL (>= 3)
 SystemRequirements: JAGS 4.x.y (http://mcmc-jags.sourceforge.net)
 Imports:
     dplyr,
