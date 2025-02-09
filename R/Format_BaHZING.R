@@ -28,7 +28,6 @@
 #' @importFrom dplyr full_join select mutate %>%
 #' @importFrom tidyr unite
 #' @importFrom stringr str_c
-#' @keywords R package, microbiome, phyloseq, taxonomic table, data formatting
 #' @export
 #' @name BHMRmicrobiome
 

@@ -23,15 +23,28 @@ test_that("test BaHZING_Model", {
   ###Set exposure standaridization to standard_normal or quantiles
   exposure_standardization = "standard_normal"
 
-  ### Perform BaH-ZING
+  ### Perform BaH-ZING with covariates
   results <- BaHZING_Model(formatted_data,
                            covar,
                            x,
                            exposure_standardization,
                            n.chains = 1,
                            n.adapt = 60,
-                           n.burnin = 2,
-                           n.sample = 2)
+                           n.iter.burnin = 2,
+                           n.iter.sample= 2)
+  # Test format data
+  testthat::expect_equal(object = ncol(results), expected = 7)
+
+
+  ### Perform BaH-ZING without covariates
+  results <- BaHZING_Model(formatted_data = formatted_data,
+                           covar = NULL,
+                           x = x,
+                           exposure_standardization = exposure_standardization,
+                           n.chains = 1,
+                           n.adapt = 60,
+                           n.iter.burnin = 2,
+                           n.iter.sample= 2)
   # Test format data
   testthat::expect_equal(object = ncol(results), expected = 7)
 })

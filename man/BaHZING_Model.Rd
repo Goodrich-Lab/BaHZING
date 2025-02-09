@@ -15,9 +15,9 @@ This function implements the BaHZING model for microbiome data analysis.}
 
 \item{n.adapt}{An integer specifying the number of iterations for adaptation in jags.model function}
 
-\item{n.burnin}{An integer specifying number of iterations in update function}
+\item{n.iter.burnin}{An integer specifying number of iterations in update function}
 
-\item{n.sample}{An integer specifying the number of iterations in coda.samples function}
+\item{n.iter.sample}{An integer specifying the number of iterations in coda.samples function}
 
 \item{exposure_standardization}{"standard_normal" or "quantile"}
 

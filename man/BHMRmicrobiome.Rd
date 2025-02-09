@@ -35,11 +35,3 @@ The function will use these column names to perform various operations.
 The column names 'Kingdom', 'Phylum', 'Class', 'Order', 'Family', 'Genus', and 'Species' in the
 tax_table are expected to be user-defined and assigned within the function.
 }
-\keyword{R}
-\keyword{data}
-\keyword{formatting}
-\keyword{microbiome,}
-\keyword{package,}
-\keyword{phyloseq,}
-\keyword{table,}
-\keyword{taxonomic}
