@@ -32,10 +32,10 @@ profiles must be specified by the user.}
 is the number of exposures in x. If a 2xP matrix is provided,
 the effect estimates for the mixture are interpreted as the estimated change
 in the outcome when changing each exposure p in 1:P is changed from
-counterfactual_profiles\link{1,p} to counterfactual_profiles\link{2,p}. If a vector of
+\code{counterfactual_profiles[1,p]} to \code{counterfactual_profiles[2,p]}. If a vector of
 length 2 is provided, the effect estimates for the mixture are interpreted as
 the estimated change in the outcome when changing each exposure from
-counterfactual_profiles\link{1} to counterfactual_profiles\link{2}. If
+\code{counterfactual_profiles[1]} to \code{counterfactual_profiles[2]}. If
 exposure_standardization = "standard_normal", then the default is c(-0.5, 0.5),
 and the effect estimate is calculated based on increasing all exposures in
 the mixture by one standard deviation. If exposure_standardization = "quantile",

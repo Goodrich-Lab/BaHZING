@@ -29,10 +29,10 @@
 #' is the number of exposures in x. If a 2xP matrix is provided,
 #' the effect estimates for the mixture are interpreted as the estimated change
 #' in the outcome when changing each exposure p in 1:P is changed from
-#' counterfactual_profiles[1,p] to counterfactual_profiles[2,p]. If a vector of
+#' `counterfactual_profiles[1,p]` to `counterfactual_profiles[2,p]`. If a vector of
 #' length 2 is provided, the effect estimates for the mixture are interpreted as
 #' the estimated change in the outcome when changing each exposure from
-#' counterfactual_profiles[1] to counterfactual_profiles[2]. If
+#' `counterfactual_profiles[1]` to `counterfactual_profiles[2]`. If
 #' exposure_standardization = "standard_normal", then the default is c(-0.5, 0.5),
 #' and the effect estimate is calculated based on increasing all exposures in
 #' the mixture by one standard deviation. If exposure_standardization = "quantile",
@@ -47,7 +47,6 @@
 #' @param return_all_estimates If FALSE (default), results do not include
 #' the dispersion and omega estimates from the BaHZING model.
 #' @return A data frame containing results of the Bayesian analysis.
-
 #' @export
 #' @name BaHZING_Model
 
@@ -55,7 +54,7 @@
 utils::globalVariables(c("LibrarySize", "X2.5.", "X97.5.", "Mean",
                          "Exposure.Index", "Taxa.Index", "Taxa_full",
                          "Component", "estimate", "estimate_lcl", "estimate_ucl",
-                         "sig", "Domain", "Taxa"))
+                         "sig", "Domain", "Taxa_name"))
 
 BaHZING_Model <- function(formatted_data,
                           x,
