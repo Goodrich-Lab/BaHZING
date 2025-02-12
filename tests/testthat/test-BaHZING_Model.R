@@ -20,10 +20,10 @@ test_that("test BaHZING_Model", {
   # covar <- c("consent_age","sex",paste0("race",0:3),paste0("educ",0:7))
   covar <- c("consent_age")
 
-  ###Set exposure standaridization to standard_normal or quantiles
+  ###Set exposure standardization to standard_normal or quantiles
   exposure_standardization = "standard_normal"
 
-  ### Perform BaH-ZING with covariates
+  ## Test BaH-ZING with covariates ----
   results <- BaHZING_Model(formatted_data,
                            covar,
                            x,
@@ -32,11 +32,10 @@ test_that("test BaHZING_Model", {
                            n.adapt = 60,
                            n.iter.burnin = 2,
                            n.iter.sample= 2)
-  # Test format data
   testthat::expect_equal(object = ncol(results), expected = 7)
 
 
-  ### Perform BaH-ZING without covariates
+  ### Test BaH-ZING without covariates ----
   results <- BaHZING_Model(formatted_data = formatted_data,
                            covar = NULL,
                            x = x,
@@ -44,7 +43,32 @@ test_that("test BaHZING_Model", {
                            n.chains = 1,
                            n.adapt = 60,
                            n.iter.burnin = 2,
-                           n.iter.sample= 2)
-  # Test format data
+                           n.iter.sample= 2,
+                           q = 1)
+
   testthat::expect_equal(object = ncol(results), expected = 7)
+
+  ### Test BaH-ZING with quantiles ----
+  results <- BaHZING_Model(formatted_data = formatted_data,
+                           covar = NULL,
+                           x = c("reads_human", "reads_qc_fail"),
+                           exposure_standardization = "quantile",
+                           n.chains = 1,
+                           n.adapt = 60,
+                           n.iter.burnin = 2,
+                           n.iter.sample= 2,
+                           q = 2)
+
+  testthat::expect_equal(object = ncol(results), expected = 7)
+
+  # Test Errors ----
+  BaHZING_Model(formatted_data = formatted_data, covar = NULL, x = x,
+                exposure_standardization = exposure_standardization,
+                n.chains = 1,
+                n.adapt = 60,
+                n.iter.burnin = 2,
+                n.iter.sample = 2)
+testthat::expect_error()
+
+
 })
