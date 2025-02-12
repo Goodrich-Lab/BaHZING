@@ -44,6 +44,8 @@
 #' "quantile" and q is not specified, then a default of q = 4 is used.
 #' @param verbose If TRUE (default), function returns information a data quality
 #' check.
+#' @param return_all_estimates If FALSE (default), results do not include
+#' the dispersion and omega estimates from the BaHZING model.
 #' @return A data frame containing results of the Bayesian analysis.
 
 #' @export
@@ -51,8 +53,9 @@
 
 # Declare global variables
 utils::globalVariables(c("LibrarySize", "X2.5.", "X97.5.", "Mean",
-                         "Exposure.Index", "Taxa.Index", "Taxa",
-                         "Component", "OR", "OR.ll", "OR.ul", "sig", "Domain"))
+                         "Exposure.Index", "Taxa.Index", "Taxa_full",
+                         "Component", "estimate", "estimate_lcl", "estimate_ucl",
+                         "sig", "Domain", "Taxa"))
 
 BaHZING_Model <- function(formatted_data,
                           x,
@@ -64,7 +67,8 @@ BaHZING_Model <- function(formatted_data,
                           n.iter.sample = 10000,
                           counterfactual_profiles = NULL,
                           q = NULL,
-                          verbose = TRUE) {
+                          verbose = TRUE,
+                          return_all_estimates = FALSE) {
 
   # 1. Check input data ----
   # Extract metadata file from formatted data
@@ -416,62 +420,18 @@ BaHZING_Model <- function(formatted_data,
                   Class.R=Class.R, ClassData=ClassData,
                   Phylum.R=Phylum.R, PhylumData=PhylumData,
                   profiles=profiles,L=L)
-    var.s <- c("species.beta", "genus.beta", "family.beta", "order.beta", "class.beta", "phylum.beta", "species.beta.zero", "genus.beta.zero", "family.beta.zero", "order.beta.zero", "class.beta.zero", "phylum.beta.zero","species.psi","genus.psi","family.psi","order.psi","class.psi","phylum.psi","species.psi.zero","genus.psi.zero","family.psi.zero","order.psi.zero","class.psi.zero","phylum.psi.zero", "omega","disp")
+    var.s <- c("species.beta", "genus.beta", "family.beta", "order.beta",
+               "class.beta", "phylum.beta", "species.beta.zero",
+               "genus.beta.zero", "family.beta.zero", "order.beta.zero",
+               "class.beta.zero", "phylum.beta.zero","species.psi","genus.psi",
+               "family.psi","order.psi","class.psi","phylum.psi",
+               "species.psi.zero","genus.psi.zero","family.psi.zero",
+               "order.psi.zero","class.psi.zero","phylum.psi.zero",
+               "omega","disp")
     model.fit <- jags.model(file=textConnection(BHRM.microbiome), data=jdata, n.chains=n.chains, n.adapt=n.adapt, quiet=F)
     update(model.fit, n.iter=n.iter.burnin, progress.bar="text")
     model.fit <- coda.samples(model=model.fit, variable.names=var.s, n.iter=n.iter.sample, thin=1, progress.bar="text")
-    # summarize results
-    r <- summary(model.fit)
-    results <- data.frame(round(r$statistics[,1:2],3), round(r$quantiles[,c(1,5)],3))
 
-    #Calculate significance based on Bayesian Interval
-    results <- results %>%
-      mutate(sig = ifelse((X2.5.<0 & X97.5.<0) | (X2.5.>0 & X97.5.>0), "*","N.S."))
-    results <- results %>%
-      mutate(OR=exp(Mean),
-             OR.ll=exp(X2.5.),
-             OR.ul=exp(X97.5.))
-    #Format output names
-    phylum <- colnames(PhylumData)
-    class <- colnames(ClassData)
-    order <- colnames(OrderData)
-    family <- colnames(FamilyData)
-    genus <- colnames(GenusData)
-    species <- colnames(Y)
-    Exposure <- colnames(X)
-    results$Taxa.Index <- str_remove(rownames(results),"..*\\[")
-    results$Taxa.Index <- str_remove(results$Taxa.Index,",.*$")
-    results$Taxa.Index <- str_remove(results$Taxa.Index,"]")
-    results$Taxa.Index <- as.numeric(results$Taxa.Index)
-    results$Exposure.Index <- str_remove(rownames(results),"..*\\,")
-    results <- results %>%
-      mutate(Exposure.Index=ifelse(grepl("disp",Exposure.Index)|grepl("omega",Exposure.Index)|grepl("psi",Exposure.Index),NA,Exposure.Index))
-    results$Exposure.Index <- str_remove(results$Exposure.Index,"]")
-    results$Exposure.Index <- as.numeric(results$Exposure.Index)
-
-    results <- results %>%
-      mutate(Taxa=case_when(grepl("phylum",rownames(results)) ~ paste0(phylum[Taxa.Index]),
-                            grepl("class",rownames(results)) ~ paste0(class[Taxa.Index]),
-                            grepl("order",rownames(results)) ~ paste0(order[Taxa.Index]),
-                            grepl("family",rownames(results)) ~ paste0(family[Taxa.Index]),
-                            grepl("genus",rownames(results)) ~ paste0(genus[Taxa.Index]),
-                            grepl("species",rownames(results)) ~ paste0(species[Taxa.Index])),
-             Exposure=paste0(Exposure[Exposure.Index]))
-    results <- results %>%
-      mutate(Component=ifelse(grepl("zero",rownames(results)),"Means","Probability"))
-
-    results <- results %>%
-      mutate(Exposure=ifelse(grepl("disp",rownames(results)),paste0("Dispersion"),
-                             ifelse(grepl("omega",rownames(results)),paste0("Omega"),Exposure)))
-    results <- results %>%
-      mutate(Exposure=ifelse(grepl("psi",rownames(results)),"Mixture",Exposure))
-    results <- results %>%
-      mutate(Taxa=ifelse(grepl("disp",rownames(results)),paste0(species[Taxa.Index]),Taxa),
-             Taxa=ifelse(grepl("omega",rownames(results)),paste0(species[Taxa.Index]),Taxa))
-    results <- results %>%
-      select(Taxa,Exposure,Component,OR,OR.ll,OR.ul,sig)
-
-    return(results)
   } else {
     # Hierarchical Model without Covariates----
     BHRM.microbiome <-
@@ -663,59 +623,108 @@ BaHZING_Model <- function(formatted_data,
     model.fit <- jags.model(file=textConnection(BHRM.microbiome), data=jdata, n.chains=n.chains, n.adapt=n.adapt, quiet=F)
     update(model.fit, n.iter=n.iter.burnin, progress.bar="text")
     model.fit <- coda.samples(model=model.fit, variable.names=var.s, n.iter=n.iter.sample, thin=1, progress.bar="text")
-    # summarize results
-    r <- summary(model.fit)
-    results <- data.frame(round(r$statistics[,1:2],3), round(r$quantiles[,c(1,5)],3))
-
-    #Calculate significance based on Bayesian Interval
-    results <- results %>%
-      mutate(sig = ifelse((X2.5.<0 & X97.5.<0) | (X2.5.>0 & X97.5.>0), "*","N.S."))
-    results <- results %>%
-      mutate(OR=exp(Mean),
-             OR.ll=exp(X2.5.),
-             OR.ul=exp(X97.5.))
-    #Format output names
-    phylum <- colnames(PhylumData)
-    class <- colnames(ClassData)
-    order <- colnames(OrderData)
-    family <- colnames(FamilyData)
-    genus <- colnames(GenusData)
-    species <- colnames(Y)
-    Exposure <- colnames(X)
-    results$Taxa.Index <- str_remove(rownames(results),"..*\\[")
-    results$Taxa.Index <- str_remove(results$Taxa.Index,",.*$")
-    results$Taxa.Index <- str_remove(results$Taxa.Index,"]")
-    results$Taxa.Index <- as.numeric(results$Taxa.Index)
-    results$Exposure.Index <- str_remove(rownames(results),"..*\\,")
-    results <- results %>%
-      mutate(Exposure.Index=ifelse(grepl("disp",Exposure.Index)|grepl("omega",Exposure.Index)|grepl("psi",Exposure.Index),NA,Exposure.Index))
-    results$Exposure.Index <- str_remove(results$Exposure.Index,"]")
-    results$Exposure.Index <- as.numeric(results$Exposure.Index)
-
-    results <- results %>%
-      mutate(Taxa=case_when(grepl("phylum",rownames(results)) ~ paste0(phylum[Taxa.Index]),
-                            grepl("class",rownames(results)) ~ paste0(class[Taxa.Index]),
-                            grepl("order",rownames(results)) ~ paste0(order[Taxa.Index]),
-                            grepl("family",rownames(results)) ~ paste0(family[Taxa.Index]),
-                            grepl("genus",rownames(results)) ~ paste0(genus[Taxa.Index]),
-                            grepl("species",rownames(results)) ~ paste0(species[Taxa.Index])),
-             Exposure=paste0(Exposure[Exposure.Index]))
-
-    results <- results %>%
-      mutate(Component=ifelse(grepl("zero",rownames(results)),"Means","Probability"))
-
-    results <- results %>%
-      mutate(Exposure=ifelse(grepl("disp",rownames(results)),paste0("Dispersion"),
-                             ifelse(grepl("omega",rownames(results)),paste0("Omega"),Exposure)))
-    results <- results %>%
-      mutate(Exposure=ifelse(grepl("psi",rownames(results)),"Mixture",Exposure))
-
-    results <- results %>%
-      mutate(Taxa=ifelse(grepl("disp",rownames(results)),paste0(species[Taxa.Index]),Taxa),
-             Taxa=ifelse(grepl("omega",rownames(results)),paste0(species[Taxa.Index]),Taxa))
-    results <- results %>%
-      select(Taxa,Exposure,Component,OR,OR.ll,OR.ul,sig)
-
-    return(results)
   }
+
+
+  # 5. summarize results -------------------------------------------------------
+  r <- summary(model.fit)
+  results <- data.frame(round(r$statistics[,1:2],3), round(r$quantiles[,c(1,5)],3))
+
+
+  # Create "component" variable
+  results <- results %>%
+    mutate(
+      Component=case_when(
+        grepl("zero",rownames(.)) ~ "Zero-inflation model coefficients",
+        grepl("beta",rownames(.)) ~ "Count model coefficients",
+        grepl("psi",rownames(.))  ~ "Count model coefficients",
+        grepl("disp",rownames(.)) ~ "Dispersion",
+        grepl("omega",rownames(.)) ~ "Omega",
+        TRUE ~ "Other"))
+
+  # Calculate significance based on Bayesian Interval, rename variables
+  results <- results %>%
+    mutate(sig = case_when(
+      grepl("disp",rownames(.)) ~ NA_character_,
+      grepl("omega",rownames(.)) ~ NA_character_,
+      (X2.5.<0 & X97.5.<0) | (X2.5.>0 & X97.5.>0) ~ "*",
+      TRUE ~ "N.S.")) |>
+    rename(estimate = Mean,
+           estimate_lcl = X2.5.,
+           estimate_ucl = X97.5.)
+
+  # Calculate odds ratios-- removed --
+  # results <- results %>%
+  #   mutate(OR=exp(Mean),
+  #          OR.ll=exp(X2.5.),
+  #          OR.ul=exp(X97.5.))
+
+  #Format output names
+  phylum   <- colnames(PhylumData)
+  class    <- colnames(ClassData)
+  order    <- colnames(OrderData)
+  family   <- colnames(FamilyData)
+  genus    <- colnames(GenusData)
+  species  <- colnames(Y)
+  Exposure <- colnames(X)
+  results$Taxa.Index <- str_remove(rownames(results),"..*\\[")
+  results$Taxa.Index <- str_remove(results$Taxa.Index,",.*$")
+  results$Taxa.Index <- str_remove(results$Taxa.Index,"]")
+  results$Taxa.Index <- as.numeric(results$Taxa.Index)
+  results$Exposure.Index <- str_remove(rownames(results),"..*\\,")
+  results <- results %>%
+    mutate(Exposure.Index=ifelse(grepl("disp",Exposure.Index)|grepl("omega",Exposure.Index)|grepl("psi",Exposure.Index),NA,Exposure.Index))
+  results$Exposure.Index <- str_remove(results$Exposure.Index,"]")
+  results$Exposure.Index <- as.numeric(results$Exposure.Index)
+
+
+  results <- results %>%
+    mutate(Taxa_full=case_when(grepl("phylum",rownames(results)) ~ paste0(phylum[Taxa.Index]),
+                               grepl("class",rownames(results)) ~ paste0(class[Taxa.Index]),
+                               grepl("order",rownames(results)) ~ paste0(order[Taxa.Index]),
+                               grepl("family",rownames(results)) ~ paste0(family[Taxa.Index]),
+                               grepl("genus",rownames(results)) ~ paste0(genus[Taxa.Index]),
+                               grepl("species",rownames(results)) ~ paste0(species[Taxa.Index])),
+           Domain=case_when(
+             grepl("phylum",rownames(results))  ~ "Phylum",
+             grepl("class",rownames(results))   ~ "Class",
+             grepl("order",rownames(results))   ~ "Order",
+             grepl("family",rownames(results))  ~ "Family",
+             grepl("genus",rownames(results))   ~ "Genus",
+             grepl("species",rownames(results)) ~ "Species"),
+           Exposure=paste0(Exposure[Exposure.Index]))
+
+  # Modify Exposure variable
+  results <- results %>%
+    mutate(Exposure=case_when(
+      grepl("psi",rownames(.)) ~ "Mixture",
+      grepl("disp",rownames(.)) ~ "Dispersion",
+      grepl("omega",rownames(.)) ~ "Omega",
+      TRUE ~ Exposure))
+
+  # Get Taxa and domain information for
+  results <- results %>%
+    mutate(Taxa_full=ifelse(grepl("disp", rownames(results)),paste0(species[Taxa.Index]),Taxa_full),
+           Taxa_full=ifelse(grepl("omega",rownames(results)),paste0(species[Taxa.Index]),Taxa_full),
+           Taxa_name = sub(".*__", "", Taxa_full),
+           Domain = ifelse(Exposure == "Dispersion" | Exposure == "Omega",
+                           "Species", Domain))
+
+  # Remove "disp" and "omega" estimates
+  if(!return_all_estimates){
+    results <- results |>
+      filter(!grepl("disp",rownames(results)),
+             !grepl("omega",rownames(results)))
+  }
+
+  # Remove rownames
+  rownames(results) <- NULL
+
+  # Select final variables
+  results <- results %>%
+    select(Taxa_full, Taxa_name, Domain, Exposure,Component,
+           estimate,estimate_lcl,estimate_ucl,sig)
+
+  return(results)
 }
+

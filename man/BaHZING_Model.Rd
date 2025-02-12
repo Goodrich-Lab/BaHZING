@@ -7,23 +7,51 @@ This function implements the BaHZING model for microbiome data analysis.}
 \arguments{
 \item{formatted_data}{An object containing formatted microbiome data.}
 
-\item{covar}{A vector of covariates.}
+\item{x}{A vector of column names of the exposures.}
 
-\item{x}{A vector of exposures.}
+\item{covar}{An optional vector of the column names of covariates.}
 
-\item{n.chains}{An integer specifying the number of parallel chains for the model in jags.model function}
+\item{n.chains}{An optional integer specifying the number of parallel chains
+for the model in jags.model function. Default is 3.}
 
-\item{n.adapt}{An integer specifying the number of iterations for adaptation in jags.model function}
+\item{n.adapt}{An optional integer specifying the number of iterations for
+adaptation in jags.model function. Default is 5000.}
 
-\item{n.iter.burnin}{An integer specifying number of iterations in update function}
+\item{n.iter.burnin}{An optional integer specifying number of iterations in
+update function. Default is 10000.}
 
-\item{n.iter.sample}{An integer specifying the number of iterations in coda.samples function}
+\item{n.iter.sample}{An optional integer specifying the number of iterations
+in coda.samples function. Default is 10000.}
 
-\item{exposure_standardization}{"standard_normal" or "quantile"}
+\item{exposure_standardization}{Method for standardizing the exposures.
+Should be one of "standard_normal" (the default), "quantile", or "none". If
+"none", exposures are not standardized before analysis, and counterfactual
+profiles must be specified by the user.}
 
-\item{counterfactual_profiles}{A 2xP matrix or a vector with length of 2; P is the column number of exposure dataframe.}
+\item{counterfactual_profiles}{A 2xP matrix or a vector with length of 2; P
+is the number of exposures in x. If a 2xP matrix is provided,
+the effect estimates for the mixture are interpreted as the estimated change
+in the outcome when changing each exposure p in 1:P is changed from
+counterfactual_profiles\link{1,p} to counterfactual_profiles\link{2,p}. If a vector of
+length 2 is provided, the effect estimates for the mixture are interpreted as
+the estimated change in the outcome when changing each exposure from
+counterfactual_profiles\link{1} to counterfactual_profiles\link{2}. If
+exposure_standardization = "standard_normal", then the default is c(-0.5, 0.5),
+and the effect estimate is calculated based on increasing all exposures in
+the mixture by one standard deviation. If exposure_standardization = "quantile",
+then the default is c(0,1), and the effect estimate is calculated based on
+increasing all exposures in the mixture by one quantile (where the number of
+quantiles is based on the parameter q).}
 
-\item{q}{An integer specifying the number of quantile groups}
+\item{q}{An integer specifying the number of quantiles. Only required if
+exposure_standardization = "quantile". If exposure_standardization =
+"quantile" and q is not specified, then a default of q = 4 is used.}
+
+\item{verbose}{If TRUE (default), function returns information a data quality
+check.}
+
+\item{return_all_estimates}{If FALSE (default), results do not include
+the dispersion and omega estimates from the BaHZING model.}
 }
 \value{
 A data frame containing results of the Bayesian analysis.
