@@ -21,7 +21,7 @@ Description: Bayesian Hierarchical Zero-Inflated Negative Binomial
     microbiome.
 License: GPL (>= 3)
 Depends: 
-    R (>= 3.50),
+    R (>= 4.1.0),
     rjags (>= 4.0.0)
 Imports:
     dplyr,
