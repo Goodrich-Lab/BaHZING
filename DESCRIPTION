@@ -1,7 +1,7 @@
 Package: BaHZING
 Title: Bayesian Hierarchical Zero-Inflated Negative Binomial Regression
     with G-Computation
-Version: 1.1.0
+Version: 1.0.0
 Authors@R: c(
     person("Hailey", "Hampson", , "hhampson@usc.edu", role = "aut"),
     person("Jesse", "Goodrich", , "jagoodri@usc.edu", role = c("aut", "cre"),
