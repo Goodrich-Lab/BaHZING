@@ -21,7 +21,10 @@
 #' update function. Default is 10000.
 #' @param n.iter.sample An optional integer specifying the number of iterations
 #' in coda.samples function. Default is 10000.
-#' @param exposure_standardization "standard_normal" or "quantile".
+#' @param exposure_standardization Method for standardizing the exposures.
+#' Should be one of "standard_normal" (the default), "quantile", or "none". If
+#' "none", exposures are not standardized before analysis, and counterfactual
+#' profiles must be specified by the user.
 #' @param counterfactual_profiles A 2xP matrix or a vector with length of 2; P
 #' is the number of exposures in x. If a 2xP matrix is provided,
 #' the effect estimates for the mixture are interpreted as the estimated change
@@ -54,7 +57,7 @@ utils::globalVariables(c("LibrarySize", "X2.5.", "X97.5.", "Mean",
 BaHZING_Model <- function(formatted_data,
                           x,
                           covar = NULL,
-                          exposure_standardization,
+                          exposure_standardization = NULL,
                           n.chains = 3,
                           n.adapt = 5000,
                           n.iter.burnin = 10000,
@@ -74,21 +77,32 @@ BaHZING_Model <- function(formatted_data,
   }
 
   # Create exposure dataframe
+  if(!all(x %in% colnames(exposure_covar_dat))) {
+    stop("Not all exposured are found in the formatted data")
+  }
   X <- exposure_covar_dat[x]
   P <- ncol(X)
+
+  # Set exposure_standardization if missing
+  if(is.null(exposure_standardization)) {
+    exposure_standardization = "standard_normal"
+  }
+  # Check exposure_standardization is within the bounds
+  if(!(exposure_standardization %in% c("standard_normal", "quantile", "none"))){
+    stop("exposure_standardization must be either standard_normal, quantile, or none")
+  }
 
   # Give warning if exposure_standardization == "standard_normal" and q is specified
   if(exposure_standardization == "standard_normal" & !is.null(q)){
     message("Note: q is not required when exposure_standardization is standard_normal. q will be ignored.")
   }
 
-  # Check exposure_standardization is within the bounds
-  if(!(exposure_standardization %in% c("standard_normal", "quantile"))){
-    stop("exposure_standardization must be either standard_normal or quantile")
+  # If standardization is "none", then check to make sure that counterfactual_profiles is specified
+  if(exposure_standardization  == "none" & is.null(counterfactual_profiles)){
+    stop("counterfactual_profiles must be speficied if exposure_standardization is none.")
   }
 
   # 2. Counterfactual profiles -----------------------------------
-
   ## 2.a Set counterfactual_profiles if missing --------
   if(is.null(counterfactual_profiles)) {
     if(exposure_standardization == "standard_normal") {
@@ -101,24 +115,24 @@ BaHZING_Model <- function(formatted_data,
   ## 2.b Check counterfactual profiles structure ----
   if (is.matrix(counterfactual_profiles)) { # Checks if matrix
     if (nrow(counterfactual_profiles) != 2) {
-      stop("Error: counterfactual_profiles must have 2 rows when provided as a matrix.")
+      stop("counterfactual_profiles must have 2 rows when provided as a matrix.")
     }
     if (ncol(counterfactual_profiles) != P) {
-      stop(paste0("Error: counterfactual_profiles must have P columns when provided as a matrix."))
+      stop(paste0("When provided as a matrix, the number of columns in counterfactual_profiles must be equal to the number of exposures in the model."))
     }
     if (!is.numeric(counterfactual_profiles)) {
-      stop("Error: counterfactual_profiles must be numeric.")
+      stop("counterfactual_profiles must be numeric.")
     }
-  } else { # Check counterfactual_profiles it is a vector
-    if(is.vector(counterfactual_profiles)) {
+  } else { # Checks if is vector
+    if (is.vector(counterfactual_profiles)) {
       if (!is.numeric(counterfactual_profiles)) {
-        stop("Error: counterfactual_profiles must be numeric.")
+        stop("counterfactual_profiles must be numeric.")
       }
       if (length(counterfactual_profiles) != 2) {
-        stop(paste0("Error: counterfactual_profiles must have 2 elements when provided as a vector."))
+        stop(paste0("counterfactual_profiles must have 2 elements when provided as a vector."))
       }
     } else {
-      stop("Error: counterfactual_profiles must be either a numeric 2xP matrix or a numeric vector with length P.")
+      stop("counterfactual_profiles must be either a numeric 2xP matrix or a numeric vector with length P.")
     }
   }
 
@@ -145,7 +159,7 @@ BaHZING_Model <- function(formatted_data,
   }
 
   # If using quantiles, quantize X
-  if (exposure_standardization=="quantile") {
+  if(exposure_standardization=="quantile") {
     probs <- seq(0, 1, length.out = q + 1)
     X.q <- apply(X, 2, function(v) {
       cut(v, breaks = c(-Inf, quantile(v, probs = probs, include.lowest = FALSE)), labels = FALSE)
@@ -155,6 +169,11 @@ BaHZING_Model <- function(formatted_data,
   #If not quantized and not standardized, scale X
   if(exposure_standardization=="standard_normal") {
     X.q <- scale(X)
+  }
+
+  #If none, no scaling
+  if(exposure_standardization == "none") {
+    X.q <- X
   }
 
   # 4. Format microbiome matricies ----
@@ -205,18 +224,22 @@ BaHZING_Model <- function(formatted_data,
     message(paste0("- Number of unique phylum in data: ", Phylum.R))
 
     message("#### Running BaHZING with the following parameters #### ")
-    if(exposure_standardization == "standard_normal"){
+    if (exposure_standardization == "standard_normal"){
       message("Exposure standardization: Standard Normal")
-    } else {
+    }
+    if (exposure_standardization == "none"){
+      message("Exposure standardization: None")
+    }
+    if (exposure_standardization == "quantile"){
       message(paste0("Exposure standardization: Quantiles, with q = ", q))
     }
   }
 
-    # 4. Run Model ----
-    if (!is.null(covar)) {
-      # Hierarchical Model with covariates----
-      BHRM.microbiome <-
-        "model {
+  # 4. Run Model ----
+  if (!is.null(covar)) {
+    # Hierarchical Model with covariates----
+    BHRM.microbiome <-
+      "model {
     for(r in 1:R) {
       for(i in 1:N) {
         Y[i,r] ~ dnegbin(mu[i,r], disp[r])
@@ -385,74 +408,74 @@ BaHZING_Model <- function(formatted_data,
 
   }"
 
-      # Run JAGs Estimation
-      jdata <- list(N=N, Y=Y, R=R, X.q=X.q, W=W, P=P, Q=Q,
-                    GenusData=GenusData, Genus.R=Genus.R,
-                    Family.R=Family.R, FamilyData=FamilyData,
-                    Order.R=Order.R, OrderData=OrderData,
-                    Class.R=Class.R, ClassData=ClassData,
-                    Phylum.R=Phylum.R, PhylumData=PhylumData,
-                    profiles=profiles,L=L)
-      var.s <- c("species.beta", "genus.beta", "family.beta", "order.beta", "class.beta", "phylum.beta", "species.beta.zero", "genus.beta.zero", "family.beta.zero", "order.beta.zero", "class.beta.zero", "phylum.beta.zero","species.psi","genus.psi","family.psi","order.psi","class.psi","phylum.psi","species.psi.zero","genus.psi.zero","family.psi.zero","order.psi.zero","class.psi.zero","phylum.psi.zero", "omega","disp")
-      model.fit <- jags.model(file=textConnection(BHRM.microbiome), data=jdata, n.chains=n.chains, n.adapt=n.adapt, quiet=F)
-      update(model.fit, n.iter=n.iter.burnin, progress.bar="text")
-      model.fit <- coda.samples(model=model.fit, variable.names=var.s, n.iter=n.iter.sample, thin=1, progress.bar="text")
-      # summarize results
-      r <- summary(model.fit)
-      results <- data.frame(round(r$statistics[,1:2],3), round(r$quantiles[,c(1,5)],3))
+    # Run JAGs Estimation
+    jdata <- list(N=N, Y=Y, R=R, X.q=X.q, W=W, P=P, Q=Q,
+                  GenusData=GenusData, Genus.R=Genus.R,
+                  Family.R=Family.R, FamilyData=FamilyData,
+                  Order.R=Order.R, OrderData=OrderData,
+                  Class.R=Class.R, ClassData=ClassData,
+                  Phylum.R=Phylum.R, PhylumData=PhylumData,
+                  profiles=profiles,L=L)
+    var.s <- c("species.beta", "genus.beta", "family.beta", "order.beta", "class.beta", "phylum.beta", "species.beta.zero", "genus.beta.zero", "family.beta.zero", "order.beta.zero", "class.beta.zero", "phylum.beta.zero","species.psi","genus.psi","family.psi","order.psi","class.psi","phylum.psi","species.psi.zero","genus.psi.zero","family.psi.zero","order.psi.zero","class.psi.zero","phylum.psi.zero", "omega","disp")
+    model.fit <- jags.model(file=textConnection(BHRM.microbiome), data=jdata, n.chains=n.chains, n.adapt=n.adapt, quiet=F)
+    update(model.fit, n.iter=n.iter.burnin, progress.bar="text")
+    model.fit <- coda.samples(model=model.fit, variable.names=var.s, n.iter=n.iter.sample, thin=1, progress.bar="text")
+    # summarize results
+    r <- summary(model.fit)
+    results <- data.frame(round(r$statistics[,1:2],3), round(r$quantiles[,c(1,5)],3))
 
-      #Calculate significance based on Bayesian Interval
-      results <- results %>%
-        mutate(sig = ifelse((X2.5.<0 & X97.5.<0) | (X2.5.>0 & X97.5.>0), "*","N.S."))
-      results <- results %>%
-        mutate(OR=exp(Mean),
-               OR.ll=exp(X2.5.),
-               OR.ul=exp(X97.5.))
-      #Format output names
-      phylum <- colnames(PhylumData)
-      class <- colnames(ClassData)
-      order <- colnames(OrderData)
-      family <- colnames(FamilyData)
-      genus <- colnames(GenusData)
-      species <- colnames(Y)
-      Exposure <- colnames(X)
-      results$Taxa.Index <- str_remove(rownames(results),"..*\\[")
-      results$Taxa.Index <- str_remove(results$Taxa.Index,",.*$")
-      results$Taxa.Index <- str_remove(results$Taxa.Index,"]")
-      results$Taxa.Index <- as.numeric(results$Taxa.Index)
-      results$Exposure.Index <- str_remove(rownames(results),"..*\\,")
-      results <- results %>%
-        mutate(Exposure.Index=ifelse(grepl("disp",Exposure.Index)|grepl("omega",Exposure.Index)|grepl("psi",Exposure.Index),NA,Exposure.Index))
-      results$Exposure.Index <- str_remove(results$Exposure.Index,"]")
-      results$Exposure.Index <- as.numeric(results$Exposure.Index)
+    #Calculate significance based on Bayesian Interval
+    results <- results %>%
+      mutate(sig = ifelse((X2.5.<0 & X97.5.<0) | (X2.5.>0 & X97.5.>0), "*","N.S."))
+    results <- results %>%
+      mutate(OR=exp(Mean),
+             OR.ll=exp(X2.5.),
+             OR.ul=exp(X97.5.))
+    #Format output names
+    phylum <- colnames(PhylumData)
+    class <- colnames(ClassData)
+    order <- colnames(OrderData)
+    family <- colnames(FamilyData)
+    genus <- colnames(GenusData)
+    species <- colnames(Y)
+    Exposure <- colnames(X)
+    results$Taxa.Index <- str_remove(rownames(results),"..*\\[")
+    results$Taxa.Index <- str_remove(results$Taxa.Index,",.*$")
+    results$Taxa.Index <- str_remove(results$Taxa.Index,"]")
+    results$Taxa.Index <- as.numeric(results$Taxa.Index)
+    results$Exposure.Index <- str_remove(rownames(results),"..*\\,")
+    results <- results %>%
+      mutate(Exposure.Index=ifelse(grepl("disp",Exposure.Index)|grepl("omega",Exposure.Index)|grepl("psi",Exposure.Index),NA,Exposure.Index))
+    results$Exposure.Index <- str_remove(results$Exposure.Index,"]")
+    results$Exposure.Index <- as.numeric(results$Exposure.Index)
 
-      results <- results %>%
-        mutate(Taxa=case_when(grepl("phylum",rownames(results)) ~ paste0(phylum[Taxa.Index]),
-                              grepl("class",rownames(results)) ~ paste0(class[Taxa.Index]),
-                              grepl("order",rownames(results)) ~ paste0(order[Taxa.Index]),
-                              grepl("family",rownames(results)) ~ paste0(family[Taxa.Index]),
-                              grepl("genus",rownames(results)) ~ paste0(genus[Taxa.Index]),
-                              grepl("species",rownames(results)) ~ paste0(species[Taxa.Index])),
-               Exposure=paste0(Exposure[Exposure.Index]))
-      results <- results %>%
-        mutate(Component=ifelse(grepl("zero",rownames(results)),"Means","Probability"))
+    results <- results %>%
+      mutate(Taxa=case_when(grepl("phylum",rownames(results)) ~ paste0(phylum[Taxa.Index]),
+                            grepl("class",rownames(results)) ~ paste0(class[Taxa.Index]),
+                            grepl("order",rownames(results)) ~ paste0(order[Taxa.Index]),
+                            grepl("family",rownames(results)) ~ paste0(family[Taxa.Index]),
+                            grepl("genus",rownames(results)) ~ paste0(genus[Taxa.Index]),
+                            grepl("species",rownames(results)) ~ paste0(species[Taxa.Index])),
+             Exposure=paste0(Exposure[Exposure.Index]))
+    results <- results %>%
+      mutate(Component=ifelse(grepl("zero",rownames(results)),"Means","Probability"))
 
-      results <- results %>%
-        mutate(Exposure=ifelse(grepl("disp",rownames(results)),paste0("Dispersion"),
-                               ifelse(grepl("omega",rownames(results)),paste0("Omega"),Exposure)))
-      results <- results %>%
-        mutate(Exposure=ifelse(grepl("psi",rownames(results)),"Mixture",Exposure))
-      results <- results %>%
-        mutate(Taxa=ifelse(grepl("disp",rownames(results)),paste0(species[Taxa.Index]),Taxa),
-               Taxa=ifelse(grepl("omega",rownames(results)),paste0(species[Taxa.Index]),Taxa))
-      results <- results %>%
-        select(Taxa,Exposure,Component,OR,OR.ll,OR.ul,sig)
+    results <- results %>%
+      mutate(Exposure=ifelse(grepl("disp",rownames(results)),paste0("Dispersion"),
+                             ifelse(grepl("omega",rownames(results)),paste0("Omega"),Exposure)))
+    results <- results %>%
+      mutate(Exposure=ifelse(grepl("psi",rownames(results)),"Mixture",Exposure))
+    results <- results %>%
+      mutate(Taxa=ifelse(grepl("disp",rownames(results)),paste0(species[Taxa.Index]),Taxa),
+             Taxa=ifelse(grepl("omega",rownames(results)),paste0(species[Taxa.Index]),Taxa))
+    results <- results %>%
+      select(Taxa,Exposure,Component,OR,OR.ll,OR.ul,sig)
 
-      return(results)
-    } else {
-      # Hierarchical Model without Covariates----
-      BHRM.microbiome <-
-        "model {
+    return(results)
+  } else {
+    # Hierarchical Model without Covariates----
+    BHRM.microbiome <-
+      "model {
     for(r in 1:R) {
       for(i in 1:N) {
         Y[i,r] ~ dnegbin(mu[i,r], disp[r])
@@ -621,78 +644,78 @@ BaHZING_Model <- function(formatted_data,
 
   }"
 
-      # Run JAGs Estimation
-      jdata <- list(N=N, Y=Y, R=R, X.q=X.q, P=P,
-                    GenusData=GenusData, Genus.R=Genus.R,
-                    Family.R=Family.R, FamilyData=FamilyData,
-                    Order.R=Order.R, OrderData=OrderData,
-                    Class.R=Class.R, ClassData=ClassData,
-                    Phylum.R=Phylum.R, PhylumData=PhylumData,
-                    profiles=profiles,L=L)
-      var.s <- c("species.beta", "genus.beta", "family.beta", "order.beta",
-                 "class.beta", "phylum.beta", "species.beta.zero",
-                 "genus.beta.zero", "family.beta.zero", "order.beta.zero",
-                 "class.beta.zero", "phylum.beta.zero","species.psi","genus.psi",
-                 "family.psi","order.psi","class.psi","phylum.psi",
-                 "species.psi.zero","genus.psi.zero","family.psi.zero",
-                 "order.psi.zero","class.psi.zero","phylum.psi.zero",
-                 "omega","disp")
-      model.fit <- jags.model(file=textConnection(BHRM.microbiome), data=jdata, n.chains=n.chains, n.adapt=n.adapt, quiet=F)
-      update(model.fit, n.iter=n.iter.burnin, progress.bar="text")
-      model.fit <- coda.samples(model=model.fit, variable.names=var.s, n.iter=n.iter.sample, thin=1, progress.bar="text")
-      # summarize results
-      r <- summary(model.fit)
-      results <- data.frame(round(r$statistics[,1:2],3), round(r$quantiles[,c(1,5)],3))
+    # Run JAGs Estimation
+    jdata <- list(N=N, Y=Y, R=R, X.q=X.q, P=P,
+                  GenusData=GenusData, Genus.R=Genus.R,
+                  Family.R=Family.R, FamilyData=FamilyData,
+                  Order.R=Order.R, OrderData=OrderData,
+                  Class.R=Class.R, ClassData=ClassData,
+                  Phylum.R=Phylum.R, PhylumData=PhylumData,
+                  profiles=profiles,L=L)
+    var.s <- c("species.beta", "genus.beta", "family.beta", "order.beta",
+               "class.beta", "phylum.beta", "species.beta.zero",
+               "genus.beta.zero", "family.beta.zero", "order.beta.zero",
+               "class.beta.zero", "phylum.beta.zero","species.psi","genus.psi",
+               "family.psi","order.psi","class.psi","phylum.psi",
+               "species.psi.zero","genus.psi.zero","family.psi.zero",
+               "order.psi.zero","class.psi.zero","phylum.psi.zero",
+               "omega","disp")
+    model.fit <- jags.model(file=textConnection(BHRM.microbiome), data=jdata, n.chains=n.chains, n.adapt=n.adapt, quiet=F)
+    update(model.fit, n.iter=n.iter.burnin, progress.bar="text")
+    model.fit <- coda.samples(model=model.fit, variable.names=var.s, n.iter=n.iter.sample, thin=1, progress.bar="text")
+    # summarize results
+    r <- summary(model.fit)
+    results <- data.frame(round(r$statistics[,1:2],3), round(r$quantiles[,c(1,5)],3))
 
-      #Calculate significance based on Bayesian Interval
-      results <- results %>%
-        mutate(sig = ifelse((X2.5.<0 & X97.5.<0) | (X2.5.>0 & X97.5.>0), "*","N.S."))
-      results <- results %>%
-        mutate(OR=exp(Mean),
-               OR.ll=exp(X2.5.),
-               OR.ul=exp(X97.5.))
-      #Format output names
-      phylum <- colnames(PhylumData)
-      class <- colnames(ClassData)
-      order <- colnames(OrderData)
-      family <- colnames(FamilyData)
-      genus <- colnames(GenusData)
-      species <- colnames(Y)
-      Exposure <- colnames(X)
-      results$Taxa.Index <- str_remove(rownames(results),"..*\\[")
-      results$Taxa.Index <- str_remove(results$Taxa.Index,",.*$")
-      results$Taxa.Index <- str_remove(results$Taxa.Index,"]")
-      results$Taxa.Index <- as.numeric(results$Taxa.Index)
-      results$Exposure.Index <- str_remove(rownames(results),"..*\\,")
-      results <- results %>%
-        mutate(Exposure.Index=ifelse(grepl("disp",Exposure.Index)|grepl("omega",Exposure.Index)|grepl("psi",Exposure.Index),NA,Exposure.Index))
-      results$Exposure.Index <- str_remove(results$Exposure.Index,"]")
-      results$Exposure.Index <- as.numeric(results$Exposure.Index)
+    #Calculate significance based on Bayesian Interval
+    results <- results %>%
+      mutate(sig = ifelse((X2.5.<0 & X97.5.<0) | (X2.5.>0 & X97.5.>0), "*","N.S."))
+    results <- results %>%
+      mutate(OR=exp(Mean),
+             OR.ll=exp(X2.5.),
+             OR.ul=exp(X97.5.))
+    #Format output names
+    phylum <- colnames(PhylumData)
+    class <- colnames(ClassData)
+    order <- colnames(OrderData)
+    family <- colnames(FamilyData)
+    genus <- colnames(GenusData)
+    species <- colnames(Y)
+    Exposure <- colnames(X)
+    results$Taxa.Index <- str_remove(rownames(results),"..*\\[")
+    results$Taxa.Index <- str_remove(results$Taxa.Index,",.*$")
+    results$Taxa.Index <- str_remove(results$Taxa.Index,"]")
+    results$Taxa.Index <- as.numeric(results$Taxa.Index)
+    results$Exposure.Index <- str_remove(rownames(results),"..*\\,")
+    results <- results %>%
+      mutate(Exposure.Index=ifelse(grepl("disp",Exposure.Index)|grepl("omega",Exposure.Index)|grepl("psi",Exposure.Index),NA,Exposure.Index))
+    results$Exposure.Index <- str_remove(results$Exposure.Index,"]")
+    results$Exposure.Index <- as.numeric(results$Exposure.Index)
 
-      results <- results %>%
-        mutate(Taxa=case_when(grepl("phylum",rownames(results)) ~ paste0(phylum[Taxa.Index]),
-                              grepl("class",rownames(results)) ~ paste0(class[Taxa.Index]),
-                              grepl("order",rownames(results)) ~ paste0(order[Taxa.Index]),
-                              grepl("family",rownames(results)) ~ paste0(family[Taxa.Index]),
-                              grepl("genus",rownames(results)) ~ paste0(genus[Taxa.Index]),
-                              grepl("species",rownames(results)) ~ paste0(species[Taxa.Index])),
-               Exposure=paste0(Exposure[Exposure.Index]))
+    results <- results %>%
+      mutate(Taxa=case_when(grepl("phylum",rownames(results)) ~ paste0(phylum[Taxa.Index]),
+                            grepl("class",rownames(results)) ~ paste0(class[Taxa.Index]),
+                            grepl("order",rownames(results)) ~ paste0(order[Taxa.Index]),
+                            grepl("family",rownames(results)) ~ paste0(family[Taxa.Index]),
+                            grepl("genus",rownames(results)) ~ paste0(genus[Taxa.Index]),
+                            grepl("species",rownames(results)) ~ paste0(species[Taxa.Index])),
+             Exposure=paste0(Exposure[Exposure.Index]))
 
-      results <- results %>%
-        mutate(Component=ifelse(grepl("zero",rownames(results)),"Means","Probability"))
+    results <- results %>%
+      mutate(Component=ifelse(grepl("zero",rownames(results)),"Means","Probability"))
 
-      results <- results %>%
-        mutate(Exposure=ifelse(grepl("disp",rownames(results)),paste0("Dispersion"),
-                               ifelse(grepl("omega",rownames(results)),paste0("Omega"),Exposure)))
-      results <- results %>%
-        mutate(Exposure=ifelse(grepl("psi",rownames(results)),"Mixture",Exposure))
+    results <- results %>%
+      mutate(Exposure=ifelse(grepl("disp",rownames(results)),paste0("Dispersion"),
+                             ifelse(grepl("omega",rownames(results)),paste0("Omega"),Exposure)))
+    results <- results %>%
+      mutate(Exposure=ifelse(grepl("psi",rownames(results)),"Mixture",Exposure))
 
-      results <- results %>%
-        mutate(Taxa=ifelse(grepl("disp",rownames(results)),paste0(species[Taxa.Index]),Taxa),
-               Taxa=ifelse(grepl("omega",rownames(results)),paste0(species[Taxa.Index]),Taxa))
-      results <- results %>%
-        select(Taxa,Exposure,Component,OR,OR.ll,OR.ul,sig)
+    results <- results %>%
+      mutate(Taxa=ifelse(grepl("disp",rownames(results)),paste0(species[Taxa.Index]),Taxa),
+             Taxa=ifelse(grepl("omega",rownames(results)),paste0(species[Taxa.Index]),Taxa))
+    results <- results %>%
+      select(Taxa,Exposure,Component,OR,OR.ll,OR.ul,sig)
 
-      return(results)
-    }
+    return(results)
+  }
 }

@@ -23,32 +23,37 @@ test_that("test BaHZING_Model", {
   ###Set exposure standardization to standard_normal or quantiles
   exposure_standardization = "standard_normal"
 
-  ## Test BaH-ZING with covariates ----
-  results <- BaHZING_Model(formatted_data,
-                           covar,
-                           x,
-                           exposure_standardization,
-                           n.chains = 1,
-                           n.adapt = 60,
-                           n.iter.burnin = 2,
-                           n.iter.sample= 2)
-  testthat::expect_equal(object = ncol(results), expected = 7)
-
-
-  ### Test BaH-ZING without covariates ----
+  # Test when it works -----
+  ## Test BaHZING with covariates ----
   results <- BaHZING_Model(formatted_data = formatted_data,
-                           covar = NULL,
                            x = x,
-                           exposure_standardization = exposure_standardization,
+                           covar = covar,
+                           exposure_standardization = "none",
                            n.chains = 1,
                            n.adapt = 60,
                            n.iter.burnin = 2,
                            n.iter.sample= 2,
-                           q = 1)
+                           counterfactual_profiles = matrix(c(0,0,1,1),
+                                                            ncol = 2,
+                                                            byrow = TRUE))
+  testthat::expect_equal(object = ncol(results), expected = 7)
+
+
+  ## Test BaH-ZING without covariates ----
+  results <- BaHZING_Model(formatted_data = formatted_data,
+                           covar = NULL,
+                           x = x,
+                           exposure_standardization = "standard_normal",
+                           n.chains = 1,
+                           n.adapt = 60,
+                           n.iter.burnin = 2,
+                           n.iter.sample= 2,
+                           counterfactual_profiles = c(-0.5, 0.5),
+                           q = 2)
 
   testthat::expect_equal(object = ncol(results), expected = 7)
 
-  ### Test BaH-ZING with quantiles ----
+  ## Test BaH-ZING with quantiles ----
   results <- BaHZING_Model(formatted_data = formatted_data,
                            covar = NULL,
                            x = c("reads_human", "reads_qc_fail"),
@@ -62,13 +67,52 @@ test_that("test BaHZING_Model", {
   testthat::expect_equal(object = ncol(results), expected = 7)
 
   # Test Errors ----
-  BaHZING_Model(formatted_data = formatted_data, covar = NULL, x = x,
-                exposure_standardization = exposure_standardization,
-                n.chains = 1,
-                n.adapt = 60,
-                n.iter.burnin = 2,
-                n.iter.sample = 2)
-testthat::expect_error()
+
+  ## if counterfactual_profiles is a vector ----
+  # Fail if wrong dimension vector
+  testthat::expect_error(
+    BaHZING_Model(formatted_data = formatted_data,
+                                       x = x,
+                  counterfactual_profiles = c(1,2,3)),
+    "counterfactual_profiles must have 2 elements when provided as a vector")
+
+  # Fail if not numeric vector
+  testthat::expect_error(
+    BaHZING_Model(formatted_data = formatted_data,
+                  x = x,
+                  counterfactual_profiles = c("A", "B")),
+    "counterfactual_profiles must be numeric")
+
+  # Check if matrix ----
+  # Fail if wrong dimension matrix
+  testthat::expect_error(
+    BaHZING_Model(formatted_data = formatted_data,
+                  x = x,
+                  counterfactual_profiles = matrix(c(1,2,3,4,5,6), nrow = 2, ncol = 3)),
+    "When provided as a matrix, the number of columns in counterfactual_profiles must be equal to the number of exposures in the model.")
+
+  testthat::expect_error(
+    BaHZING_Model(formatted_data = formatted_data,
+                  x = x,
+                  counterfactual_profiles = matrix(c(1,2,3,4,5,6), nrow = 3, ncol = 2)),
+    "counterfactual_profiles must have 2 rows when provided as a matrix.")
+
+
+  # Fail if dataframe ----
+  testthat::expect_error(
+    BaHZING_Model(formatted_data = formatted_data,
+                  x = x,
+                  counterfactual_profiles = data.frame(matrix(c(1,2,3,4,5,6), nrow = 2, ncol = 3))),
+    "counterfactual_profiles must be either a numeric 2xP matrix or a numeric vector with length P.")
+
+
+  # Fail if non-numeric matrix ---
+  testthat::expect_error(
+    BaHZING_Model(formatted_data = formatted_data,
+                  x = x,
+                  counterfactual_profiles = matrix(c(rep("A", 4)), nrow = 2, ncol = 2)),
+    "counterfactual_profiles must be numeric.")
+
 
 
 })
