@@ -647,7 +647,7 @@ BaHZING_Model <- function(formatted_data,
       grepl("disp",rownames(.)) ~ NA_character_,
       grepl("omega",rownames(.)) ~ NA_character_,
       (X2.5.<0 & X97.5.<0) | (X2.5.>0 & X97.5.>0) ~ "*",
-      TRUE ~ "N.S.")) |>
+      TRUE ~ "N.S.")) %>%
     rename(estimate = Mean,
            estimate_lcl = X2.5.,
            estimate_ucl = X97.5.)
@@ -711,7 +711,7 @@ BaHZING_Model <- function(formatted_data,
 
   # Remove "disp" and "omega" estimates
   if(!return_all_estimates){
-    results <- results |>
+    results <- results %>%
       filter(!grepl("disp",rownames(results)),
              !grepl("omega",rownames(results)))
   }
