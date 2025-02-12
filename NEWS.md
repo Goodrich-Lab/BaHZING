@@ -1,3 +1,3 @@
-# BaHZING 1.1.0
+# BaHZING 1.0.0
 
 * Initial CRAN submission.
