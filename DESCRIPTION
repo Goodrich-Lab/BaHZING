@@ -25,14 +25,14 @@ Depends:
     rjags (>= 4.0.0)
 Imports:
     dplyr,
-    ggplot2,
     magrittr,
     phyloseq,
     pscl,
     R2jags,
     stats,
     stringr,
-    tidyr
+    tidyr,
+    utils
 Suggests:
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
