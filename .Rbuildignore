@@ -6,3 +6,4 @@
 ^README\.Rmd$
 ^.RDataTmp$
 ^dev$
+^cran-comments\.md$
