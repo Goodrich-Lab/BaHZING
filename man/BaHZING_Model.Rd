@@ -52,10 +52,47 @@ check.}
 
 \item{return_all_estimates}{If FALSE (default), results do not include
 the dispersion and omega estimates from the BaHZING model.}
+
+\item{ROPE_range}{Region of practical equivalence (ROPE) for calculating
+p_rope. Default is c(-0.1, 0.1).}
 }
 \value{
-A data frame containing results of the Bayesian analysis.
+A data frame containing results of the Bayesian analysis, with the
+following columns:
+\itemize{
+\item taxa_full: Full Taxa information, including all levels of the taxonomy.
+Taxanomic levels are split by two underscores ('__').
+\item taxa_name: Taxa name, which is the last level of the taxonomy.
+\item domain: Domain of the taxa.
+\item exposure: Exposure name (either one of  the individual exposures, or the
+mixture).
+\item component: Zero inflated model estimate or the Count model estimate.
+\item estimate: Point estimate of the posterior distributions.
+\item bci_lcl: 95\% Bayesian Credible Interval Lower Limit. Calculated as the
+equal tailed interval of posterior distributions using the quantiles method.
+\item bci_ucl: 95\% Bayesian Credible Interval Upper Limit. Calculated as the
+equal tailed interval of posterior distributions using the quantiles method.
+\item p_direction: The Probability of Direction, calculated with \code{bayestestR}. A
+higher value suggests a higher probability that the estimate is strictly
+positive or negative. In other words, the closer the value to 1, the higher
+the probability that the estimate is non-zero. Values can not be less than
+50\%. From \code{bayestestR}: also known as the Maximum Probability of Effect -
+MPE. This can be interpreted as the probability that a parameter (described
+by its posterior distribution) is strictly positive or negative (whichever
+is the most probable). Although differently expressed, this index is fairly
+similar (i.e., is strongly correlated) to the frequentist p-value.
+\item p_rope: The probability that the estimate is not within the Region of
+practical equivalence (ROPE), calculated with \code{bayestestR}. The proportion
+of the whole posterior distribution that doesn't lie within the \code{ROPE_range}.
+\item p_map: Bayesian equivalent of the p-value, calculated with \code{bayestestR}.
+From \code{bayestestR}:  p_map is related to the odds that a parameter (described
+by its posterior distribution) has against the null hypothesis (h0) using
+Mills' (2014, 2017) Objective Bayesian Hypothesis Testing framework. It
+corresponds to the density value at the null (e.g., 0) divided by the
+density at the Maximum A Posteriori (MAP).
+}
 }
 \description{
-Load Packages
+BaHZING_Model Function
+This function implements the BaHZING model for microbiome data analysis.
 }

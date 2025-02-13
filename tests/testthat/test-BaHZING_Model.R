@@ -36,7 +36,7 @@ test_that("test BaHZING_Model", {
                            counterfactual_profiles = matrix(c(0,0,1,1),
                                                             ncol = 2,
                                                             byrow = TRUE))
-  testthat::expect_equal(object = ncol(results), expected = 9)
+  testthat::expect_equal(object = ncol(results), expected = 11)
 
 
   ## Test BaH-ZING without covariates ----
@@ -51,7 +51,7 @@ test_that("test BaHZING_Model", {
                            counterfactual_profiles = c(-0.5, 0.5),
                            q = 2)
 
-  testthat::expect_equal(object = ncol(results), expected = 9)
+  testthat::expect_equal(object = ncol(results), expected = 11)
 
   ## Test BaH-ZING with quantiles ----
   results <- BaHZING_Model(formatted_data = formatted_data,
@@ -64,7 +64,7 @@ test_that("test BaHZING_Model", {
                            n.iter.sample= 2,
                            q = 2)
 
-  testthat::expect_equal(object = ncol(results), expected = 9)
+  testthat::expect_equal(object = ncol(results), expected = 11)
 
   # Test Errors ----
 
