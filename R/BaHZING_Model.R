@@ -83,7 +83,7 @@
 #' @name BaHZING_Model
 
 # Declare global variables
-utils::globalVariables(c("LibrarySize", "X2.5.", "X97.5.", "Mean",
+globalVariables(c("LibrarySize", "X2.5.", "X97.5.", "Mean",
                          "Exposure.Index", "taxa_index", "taxa_full",
                          "component", "estimate", "bci_lcl", "bci_ucl",
                          "domain", "taxa_name", "pdir","prope","pmap",

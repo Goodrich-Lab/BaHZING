@@ -46,7 +46,7 @@
 #' @name Format_BaHZING
 
 # Declare global variables
-utils::globalVariables(c("Domain"))
+globalVariables(c("Domain"))
 
 Format_BaHZING <- function(phyloseq.object) {
   # Initialize variables to store taxonomic levels and ASV information
