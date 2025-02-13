@@ -52,7 +52,7 @@
 #' - taxa_full: Full Taxa information, including all levels of the taxonomy.
 #' Taxanomic levels are split by two underscores ('__').
 #' - taxa_name: Taxa name, which is the last level of the taxonomy.
-#' - domain: Domain of the taxa.
+#' - domain: domain of the taxa.
 #' - exposure: Exposure name (either one of  the individual exposures, or the
 #' mixture).
 #' - component: Zero inflated model estimate or the Count model estimate.
@@ -65,8 +65,8 @@
 #' higher value suggests a higher probability that the estimate is strictly
 #' positive or negative. In other words, the closer the value to 1, the higher
 #' the probability that the estimate is non-zero. Values can not be less than
-#' 50%. From `bayestestR`: also known as the Maximum Probability of Effect -
-#' MPE. This can be interpreted as the probability that a parameter (described
+#' 50%. From `bayestestR`: also known as the Maximum Probability of Effect
+#' (MPE). This can be interpreted as the probability that a parameter (described
 #' by its posterior distribution) is strictly positive or negative (whichever
 #' is the most probable). Although differently expressed, this index is fairly
 #' similar (i.e., is strongly correlated) to the frequentist p-value.
@@ -86,7 +86,8 @@
 utils::globalVariables(c("LibrarySize", "X2.5.", "X97.5.", "Mean",
                          "Exposure.Index", "taxa_index", "taxa_full",
                          "component", "estimate", "bci_lcl", "bci_ucl",
-                         "domain", "taxa_name", "pdir","prope","pmap"))
+                         "domain", "taxa_name", "pdir","prope","pmap",
+                         "name"))
 
 BaHZING_Model <- function(formatted_data,
                           x,

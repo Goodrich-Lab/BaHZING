@@ -42,7 +42,7 @@ pak::pak("Goodrich-Lab/BaHZING")
 
 ## Input Requirements
 
-BaHZING’s formatting function requires a phyloseq object as the input.
+The BaHZING formatting function requires a phyloseq object as the input.
 Ensure that your phyloseq object adheres to the required format. Refer
 to the phyloseq documentation for details on creating and manipulating
 phyloseq objects. For covariates in phyloseq object: All categorical

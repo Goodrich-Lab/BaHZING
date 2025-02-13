@@ -63,7 +63,7 @@ following columns:
 \item taxa_full: Full Taxa information, including all levels of the taxonomy.
 Taxanomic levels are split by two underscores ('__').
 \item taxa_name: Taxa name, which is the last level of the taxonomy.
-\item domain: Domain of the taxa.
+\item domain: domain of the taxa.
 \item exposure: Exposure name (either one of  the individual exposures, or the
 mixture).
 \item component: Zero inflated model estimate or the Count model estimate.
@@ -76,8 +76,8 @@ equal tailed interval of posterior distributions using the quantiles method.
 higher value suggests a higher probability that the estimate is strictly
 positive or negative. In other words, the closer the value to 1, the higher
 the probability that the estimate is non-zero. Values can not be less than
-50\%. From \code{bayestestR}: also known as the Maximum Probability of Effect -
-MPE. This can be interpreted as the probability that a parameter (described
+50\%. From \code{bayestestR}: also known as the Maximum Probability of Effect
+(MPE). This can be interpreted as the probability that a parameter (described
 by its posterior distribution) is strictly positive or negative (whichever
 is the most probable). Although differently expressed, this index is fairly
 similar (i.e., is strongly correlated) to the frequentist p-value.

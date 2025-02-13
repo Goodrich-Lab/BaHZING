@@ -22,6 +22,7 @@ Depends:
     R (>= 4.1.0),
     rjags (>= 4.0.0)
 Imports:
+    bayestestR,
     dplyr,
     magrittr,
     phyloseq,

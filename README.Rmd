@@ -48,7 +48,7 @@ pak::pak("Goodrich-Lab/BaHZING")
 ```
 
 ## Input Requirements
-BaHZING's formatting function requires a phyloseq object as the input. Ensure that your phyloseq object adheres to the required format. Refer to the phyloseq documentation for details on creating and manipulating phyloseq objects. 
+The BaHZING formatting function requires a phyloseq object as the input. Ensure that your phyloseq object adheres to the required format. Refer to the phyloseq documentation for details on creating and manipulating phyloseq objects. 
 For covariates in phyloseq object: All categorical covariates must be formatted as binary indicator variables rather than categorical or factor variables. 
 For missing data: Ensure that there are no NA values in your data, perform the necessary filtering or imputation methods necessary to handle these values as BaHZING cannot function with missing data. 
 

@@ -3,6 +3,20 @@
 #' This function takes a phyloseq object and performs formatting operations on it,
 #' including modifying the taxonomic table, uniting taxonomic levels, and creating
 #' matrices based on taxonomic information.
+#' @details
+#' The Format_BaHZING function is the core function of the Format_BaHZING package.
+#' It takes a phyloseq object as input and performs various formatting operations
+#' to prepare the data for analysis. The function modifies the taxonomic table to add
+#' taxonomic prefixes (e.g., "d__" for Kingdom), unites taxonomic levels, and creates
+#' matrices based on taxonomic information. The formatted data is then returned as a list
+#' containing different data frames for further analysis.
+#'
+#' The package relies on the `phyloseq`, `dplyr`, and `stringr` packages for data manipulation,
+#' and also uses functions from `tidyr` to unite taxonomic levels.
+#'
+#' The main function `Format_BaHZING` is exported and can be accessed by other packages or scripts
+#' that depend on the functionalities provided by this package.
+#'
 #'
 #' @param phyloseq.object A phyloseq object.
 #' @return A list with the following elements:
@@ -29,8 +43,10 @@
 #' @importFrom tidyr unite
 #' @importFrom stringr str_c
 #' @export
-#' @name BHMRmicrobiome
+#' @name Format_BaHZING
 
+# Declare global variables
+utils::globalVariables(c("Domain"))
 
 Format_BaHZING <- function(phyloseq.object) {
   # Initialize variables to store taxonomic levels and ASV information
@@ -358,18 +374,3 @@ Format_BaHZING <- function(phyloseq.object) {
   # Return the 'Object' list containing the matrices representing relationships between taxonomic levels
   return(Object)
 }
-
-
-#' @details
-#' The BHMRmicrobiome function is the core function of the BHMRmicrobiome package.
-#' It takes a phyloseq object as input and performs various formatting operations
-#' to prepare the data for analysis. The function modifies the taxonomic table to add
-#' taxonomic prefixes (e.g., "d__" for Kingdom), unites taxonomic levels, and creates
-#' matrices based on taxonomic information. The formatted data is then returned as a list
-#' containing different data frames for further analysis.
-#'
-#' The package relies on the `phyloseq`, `dplyr`, and `stringr` packages for data manipulation,
-#' and also uses functions from `tidyr` to unite taxonomic levels.
-#'
-#' The main function `BHMRmicrobiome` is exported and can be accessed by other packages or scripts
-#' that depend on the functionalities provided by this package.
