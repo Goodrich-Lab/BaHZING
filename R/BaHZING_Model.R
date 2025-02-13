@@ -1,7 +1,5 @@
 #' BaHZING_Model Function
 #' This function implements the BaHZING model for microbiome data analysis.
-#'
-#' Load Packages
 #' @import R2jags
 #' @import rjags
 #' @import pscl
@@ -10,6 +8,7 @@
 #' @import phyloseq
 #' @import stringr
 #' @importFrom stats quantile update
+#' @importFrom bayestestR p_direction p_rope p_map
 #' @param formatted_data An object containing formatted microbiome data.
 #' @param x A vector of column names of the exposures.
 #' @param covar An optional vector of the column names of covariates.
@@ -46,15 +45,49 @@
 #' check.
 #' @param return_all_estimates If FALSE (default), results do not include
 #' the dispersion and omega estimates from the BaHZING model.
-#' @return A data frame containing results of the Bayesian analysis.
+#' @param ROPE_range Region of practical equivalence (ROPE) for calculating
+#' p_rope. Default is c(-0.1, 0.1).
+#' @return A data frame containing results of the Bayesian analysis, with the
+#' following columns:
+#' - taxa_full: Full Taxa information, including all levels of the taxonomy.
+#' Taxanomic levels are split by two underscores ('__').
+#' - taxa_name: Taxa name, which is the last level of the taxonomy.
+#' - domain: domain of the taxa.
+#' - exposure: Exposure name (either one of  the individual exposures, or the
+#' mixture).
+#' - component: Zero inflated model estimate or the Count model estimate.
+#' - estimate: Point estimate of the posterior distributions.
+#' - bci_lcl: 95% Bayesian Credible Interval Lower Limit. Calculated as the
+#' equal tailed interval of posterior distributions using the quantiles method.
+#' - bci_ucl: 95% Bayesian Credible Interval Upper Limit. Calculated as the
+#' equal tailed interval of posterior distributions using the quantiles method.
+#' - p_direction: The Probability of Direction, calculated with `bayestestR`. A
+#' higher value suggests a higher probability that the estimate is strictly
+#' positive or negative. In other words, the closer the value to 1, the higher
+#' the probability that the estimate is non-zero. Values can not be less than
+#' 50%. From `bayestestR`: also known as the Maximum Probability of Effect
+#' (MPE). This can be interpreted as the probability that a parameter (described
+#' by its posterior distribution) is strictly positive or negative (whichever
+#' is the most probable). Although differently expressed, this index is fairly
+#' similar (i.e., is strongly correlated) to the frequentist p-value.
+#' - p_rope: The probability that the estimate is not within the Region of
+#' practical equivalence (ROPE), calculated with `bayestestR`. The proportion
+#' of the whole posterior distribution that doesn't lie within the `ROPE_range`.
+#' - p_map: Bayesian equivalent of the p-value, calculated with `bayestestR`.
+#'  From `bayestestR`:  p_map is related to the odds that a parameter (described
+#'  by its posterior distribution) has against the null hypothesis (h0) using
+#'   Mills' (2014, 2017) Objective Bayesian Hypothesis Testing framework. It
+#'   corresponds to the density value at the null (e.g., 0) divided by the
+#'   density at the Maximum A Posteriori (MAP).
 #' @export
 #' @name BaHZING_Model
 
 # Declare global variables
-utils::globalVariables(c("LibrarySize", "X2.5.", "X97.5.", "Mean",
-                         "Exposure.Index", "Taxa.Index", "Taxa_full",
-                         "Component", "estimate", "estimate_lcl", "estimate_ucl",
-                         "sig", "Domain", "Taxa_name"))
+globalVariables(c("LibrarySize", "X2.5.", "X97.5.", "Mean",
+                         "Exposure.Index", "taxa_index", "taxa_full",
+                         "component", "estimate", "bci_lcl", "bci_ucl",
+                         "domain", "taxa_name", "pdir","prope","pmap",
+                         "name"))
 
 BaHZING_Model <- function(formatted_data,
                           x,
@@ -67,7 +100,8 @@ BaHZING_Model <- function(formatted_data,
                           counterfactual_profiles = NULL,
                           q = NULL,
                           verbose = TRUE,
-                          return_all_estimates = FALSE) {
+                          return_all_estimates = FALSE,
+                          ROPE_range = c(-0.1, 0.1)) {
 
   # 1. Check input data ----
   # Extract metadata file from formatted data
@@ -619,21 +653,60 @@ BaHZING_Model <- function(formatted_data,
                "species.psi.zero","genus.psi.zero","family.psi.zero",
                "order.psi.zero","class.psi.zero","phylum.psi.zero",
                "omega","disp")
-    model.fit <- jags.model(file=textConnection(BHRM.microbiome), data=jdata, n.chains=n.chains, n.adapt=n.adapt, quiet=F)
+    model.fit <- jags.model(file=textConnection(BHRM.microbiome), data=jdata,
+                            n.chains=n.chains, n.adapt=n.adapt, quiet=F)
     update(model.fit, n.iter=n.iter.burnin, progress.bar="text")
-    model.fit <- coda.samples(model=model.fit, variable.names=var.s, n.iter=n.iter.sample, thin=1, progress.bar="text")
+    model.fit <- coda.samples(model=model.fit, variable.names=var.s,
+                              n.iter=n.iter.sample, thin=1, progress.bar="text")
   }
 
-
   # 5. summarize results -------------------------------------------------------
+  ## Calculate Mean, SD, and quantiles ----
   r <- summary(model.fit)
   results <- data.frame(round(r$statistics[,1:2],3), round(r$quantiles[,c(1,5)],3))
 
+  ## Calculate HPD intervals (not included in current version) ------
+  # x1 <- HPDinterval(model.fit[[1]], prob = 0.95)  %>% as.data.frame()
 
-  # Create "component" variable
+  ## Calculate p-values  ------
+  post_dist <-  as.data.frame(model.fit[[1]])[, grep("beta|zero|psi", colnames(model.fit[[1]]))]
+
+  ### p_direction ----
+  pdir <- apply(post_dist, 2, function(x){
+    p_direction(x = x, threshold = 0.05) %>%
+      as.numeric()})
+
+  ### p_rope ----
+  prope <- apply(post_dist, 2, function(x){
+    p_rope(x = x, rope = ROPE_range)$p_ROPE})
+
+  ### p_map ----
+  pmap <- apply(post_dist, 2, function(x){
+    p_map(x = x) %>%
+      as.numeric()})
+
+  # Get dataframe of p-values
+  p_value_df <- data.frame(name = names(pdir),
+                           pdir = pdir,
+                           prope = prope,
+                           pmap = pmap)
+
+  # # "Significant" example
+  # bayestestR::describe_posterior(post_dist$`family.beta[1,1]`)
+  # (pdirection <- bayestestR::p_direction(post_dist$`family.beta[1,1]`, as_p = TRUE)) %>% as.numeric()
+  # (prope <- bayestestR::p_rope(post_dist$`family.beta[1,1]`, rope = c(-0.1, 0.1), as_p = TRUE) %>% as.numeric())
+  # (pmap <- bayestestR::p_map(post_dist$`family.beta[1,1]`)) %>% as.numeric()
+  # (ps <- bayestestR::p_significance(post_dist$`family.beta[1,1]`, rope = c(-0.1, 0.1), as_p = TRUE))
+  #
+  # # "Non-significant" example
+  # bayestestR::describe_posterior(post_dist$`species.beta[189,2]`)
+  # bayestestR::p_direction(post_dist$`species.beta[189,2]`, as_p = TRUE)
+  # bayestestR::p_rope(post_dist$`species.beta[189,2]`, rope = c(-0.1, 0.1))
+
+  ## Create "component" variable ----
   results <- results %>%
     mutate(
-      Component=case_when(
+      component=case_when(
         grepl("zero",rownames(.)) ~ "Zero-inflation model coefficients",
         grepl("beta",rownames(.)) ~ "Count model coefficients",
         grepl("psi",rownames(.))  ~ "Count model coefficients",
@@ -641,19 +714,25 @@ BaHZING_Model <- function(formatted_data,
         grepl("omega",rownames(.)) ~ "Omega",
         TRUE ~ "Other"))
 
-  # Calculate significance based on Bayesian Interval, rename variables
+  # Calculate significance based on Bayesian Interval, rename variables (removed- jg 02_13_25 in place of p-values)
   results <- results %>%
-    mutate(sig = case_when(
-      grepl("disp",rownames(.)) ~ NA_character_,
-      grepl("omega",rownames(.)) ~ NA_character_,
-      (X2.5.<0 & X97.5.<0) | (X2.5.>0 & X97.5.>0) ~ "*",
-      TRUE ~ "N.S.")) %>%
+    # mutate(bci_inc_zero = case_when(
+    #   grepl("disp",rownames(.)) ~ NA_character_,
+    #   grepl("omega",rownames(.)) ~ NA_character_,
+    #   (X2.5.<0 & X97.5.<0) | (X2.5.>0 & X97.5.>0) ~ "BCI ",
+    #   TRUE ~ "N.S.")) %>%
     rename(estimate = Mean,
-           estimate_lcl = X2.5.,
-           estimate_ucl = X97.5.)
+           bci_lcl = X2.5.,
+           bci_ucl = X97.5.)
+
+  # Combine results df with p-value df
+  results$name = rownames(results)
+  results2 <- left_join(results, p_value_df, by = "name")
+  rownames(results2) <- results2$name
+  results2 <- results2 %>% select(-name)
 
   # Calculate odds ratios-- removed --
-  # results <- results %>%
+  # results2 <- results2 %>%
   #   mutate(OR=exp(Mean),
   #          OR.ll=exp(X2.5.),
   #          OR.ul=exp(X97.5.))
@@ -665,65 +744,70 @@ BaHZING_Model <- function(formatted_data,
   family   <- colnames(FamilyData)
   genus    <- colnames(GenusData)
   species  <- colnames(Y)
-  Exposure <- colnames(X)
-  results$Taxa.Index <- str_remove(rownames(results),"..*\\[")
-  results$Taxa.Index <- str_remove(results$Taxa.Index,",.*$")
-  results$Taxa.Index <- str_remove(results$Taxa.Index,"]")
-  results$Taxa.Index <- as.numeric(results$Taxa.Index)
-  results$Exposure.Index <- str_remove(rownames(results),"..*\\,")
-  results <- results %>%
-    mutate(Exposure.Index=ifelse(grepl("disp",Exposure.Index)|grepl("omega",Exposure.Index)|grepl("psi",Exposure.Index),NA,Exposure.Index))
-  results$Exposure.Index <- str_remove(results$Exposure.Index,"]")
-  results$Exposure.Index <- as.numeric(results$Exposure.Index)
+  exposure <- colnames(X)
+  results2$taxa_index <- str_remove(rownames(results2),"..*\\[")
+  results2$taxa_index <- str_remove(results2$taxa_index,",.*$")
+  results2$taxa_index <- str_remove(results2$taxa_index,"]")
+  results2$taxa_index <- as.numeric(results2$taxa_index)
+  results2$Exposure.Index <- str_remove(rownames(results2),"..*\\,")
+  results2 <- results2 %>%
+    mutate(Exposure.Index=ifelse(
+      grepl("disp",Exposure.Index)|
+        grepl("omega",Exposure.Index)|
+        grepl("psi",Exposure.Index),
+      NA,Exposure.Index))
+  results2$Exposure.Index <- str_remove(results2$Exposure.Index,"]")
+  results2$Exposure.Index <- as.numeric(results2$Exposure.Index)
 
 
-  results <- results %>%
-    mutate(Taxa_full=case_when(grepl("phylum",rownames(results)) ~ paste0(phylum[Taxa.Index]),
-                               grepl("class",rownames(results)) ~ paste0(class[Taxa.Index]),
-                               grepl("order",rownames(results)) ~ paste0(order[Taxa.Index]),
-                               grepl("family",rownames(results)) ~ paste0(family[Taxa.Index]),
-                               grepl("genus",rownames(results)) ~ paste0(genus[Taxa.Index]),
-                               grepl("species",rownames(results)) ~ paste0(species[Taxa.Index])),
-           Domain=case_when(
-             grepl("phylum",rownames(results))  ~ "Phylum",
-             grepl("class",rownames(results))   ~ "Class",
-             grepl("order",rownames(results))   ~ "Order",
-             grepl("family",rownames(results))  ~ "Family",
-             grepl("genus",rownames(results))   ~ "Genus",
-             grepl("species",rownames(results)) ~ "Species"),
-           Exposure=paste0(Exposure[Exposure.Index]))
+  results2 <- results2 %>%
+    mutate(taxa_full=case_when(
+      grepl("phylum",rownames(results2)) ~ paste0(phylum[taxa_index]),
+      grepl("class"  ,rownames(results2)) ~ paste0(class[taxa_index]),
+      grepl("order"  ,rownames(results2)) ~ paste0(order[taxa_index]),
+      grepl("family" ,rownames(results2)) ~ paste0(family[taxa_index]),
+      grepl("genus"  ,rownames(results2)) ~ paste0(genus[taxa_index]),
+      grepl("species",rownames(results2)) ~ paste0(species[taxa_index])),
+      domain=case_when(
+        grepl("phylum" ,rownames(results2))  ~ "Phylum",
+        grepl("class"  ,rownames(results2))   ~ "Class",
+        grepl("order"  ,rownames(results2))   ~ "Order",
+        grepl("family" ,rownames(results2))  ~ "Family",
+        grepl("genus"  ,rownames(results2))   ~ "Genus",
+        grepl("species",rownames(results2)) ~ "Species"),
+      exposure=paste0(exposure[Exposure.Index]))
 
   # Modify Exposure variable
-  results <- results %>%
-    mutate(Exposure=case_when(
+  results2 <- results2 %>%
+    mutate(exposure=case_when(
       grepl("psi",rownames(.)) ~ "Mixture",
       grepl("disp",rownames(.)) ~ "Dispersion",
       grepl("omega",rownames(.)) ~ "Omega",
-      TRUE ~ Exposure))
+      TRUE ~ exposure))
 
   # Get Taxa and domain information for
-  results <- results %>%
-    mutate(Taxa_full=ifelse(grepl("disp", rownames(results)),paste0(species[Taxa.Index]),Taxa_full),
-           Taxa_full=ifelse(grepl("omega",rownames(results)),paste0(species[Taxa.Index]),Taxa_full),
-           Taxa_name = sub(".*__", "", Taxa_full),
-           Domain = ifelse(Exposure == "Dispersion" | Exposure == "Omega",
-                           "Species", Domain))
+  results2 <- results2 %>%
+    mutate(taxa_full=ifelse(grepl("disp", rownames(results2)),paste0(species[taxa_index]),taxa_full),
+           taxa_full=ifelse(grepl("omega",rownames(results2)),paste0(species[taxa_index]),taxa_full),
+           taxa_name = sub(".*__", "", taxa_full),
+           domain = ifelse(exposure == "Dispersion" | exposure == "Omega",
+                           "Species", domain))
 
   # Remove "disp" and "omega" estimates
   if(!return_all_estimates){
-    results <- results %>%
-      filter(!grepl("disp",rownames(results)),
-             !grepl("omega",rownames(results)))
+    results2 <- results2 %>%
+      filter(!grepl("disp",rownames(results2)),
+             !grepl("omega",rownames(results2)))
   }
 
   # Remove rownames
-  rownames(results) <- NULL
+  rownames(results2) <- NULL
 
   # Select final variables
-  results <- results %>%
-    select(Taxa_full, Taxa_name, Domain, Exposure,Component,
-           estimate,estimate_lcl,estimate_ucl,sig)
+  results2 <- results2 %>%
+    select(taxa_full, taxa_name, domain, exposure,component,
+           estimate,bci_lcl,bci_ucl,pdir,prope,pmap)
 
-  return(results)
+  return(results2)
 }
 
