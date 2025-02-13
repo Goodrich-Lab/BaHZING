@@ -26,8 +26,14 @@ exposures and gut microbiome outcomes.
 
 ## Installation
 
-You can install the development version of BaHZING from
-[GitHub](https://github.com/) with:
+You can install `BaHZING` from [CRAN](https://cran.r-project.org/) with:
+
+``` r
+# install.packages("BaHZING")
+```
+
+Alternatively, you can install the development version of `BaHZING` from
+[GitHub](https://github.com/):
 
 ``` r
 # install.packages("pak")
@@ -105,7 +111,7 @@ bahzing_resout <- BaHZING_Model(formatted_data,
                          n.chains = 1,
                          n.adapt = 60,
                          n.iter.burnin = 2,
-                         n.iter.sample = 2)
+                         n.iter.sample = 50)
 #> #### Checking input data ####
 #> Exposure and Covariate Data:
 #> - Total sample size: 105
@@ -134,22 +140,27 @@ bahzing_resout <- BaHZING_Model(formatted_data,
 ``` r
 # Summarize the results 
 ## Lets examine the Count model coefficients
-count_estimates <- bahzing_resout[bahzing_resout$Component == "Count model coefficients", ]
+count_estimates <- bahzing_resout[bahzing_resout$component == "Count model coefficients", ]
 
 # Lets look at only the family level results
-family_res_out <- count_estimates[count_estimates$Domain == "Family",]
+family_res_out <- count_estimates[count_estimates$domain == "Family",]
+
+# Having a probabilty of direction > 0.975 is equivalent to examining 
+# whether the 95% BCI is overlapping with 0:
+family_res_out$p_Dir_sig <-  ifelse(family_res_out$pdir > 0.975, 
+                                    "pDIR Sig", "pDIR Not Sig")
 
 # Plot the genus results
-ggplot(family_res_out, aes(x = estimate, y = Taxa_name, color = sig)) +
+ggplot(family_res_out, aes(x = estimate, y = taxa_name, color = p_Dir_sig)) +
   geom_point() +
-  geom_errorbar(aes(xmin = estimate_lcl, xmax = estimate_ucl), width = 0) +
+  geom_errorbar(aes(xmin = bci_lcl, xmax = bci_ucl), width = 0) +
   geom_vline(xintercept = 0, linetype = 2) +
-  facet_grid(~Exposure) +
+  facet_grid(~exposure) +
   theme_classic() + 
   labs(title = "Family-level count model results",
        x = "Log fold-change",
        y = "Family",
-       color = "Component")
+       color = "Probability of Direction")
 ```
 
 <img src="man/figures/README-unnamed-chunk-1-1.png" width="100%" />

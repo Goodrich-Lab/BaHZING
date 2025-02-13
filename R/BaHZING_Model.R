@@ -1,4 +1,4 @@
-#' BaHZING Function
+#' BaHZING_Model Function
 #' This function implements the BaHZING model for microbiome data analysis.
 #' @import R2jags
 #' @import rjags
