@@ -11,14 +11,12 @@ Authors@R: c(
     person("Shardul", "Nazirkar", , "nazirkar@usc.edu", role = "ctb"),
     person("David", "Conti", , "dconti@usc.edu", role = "aut")
   )
-Description: Bayesian Hierarchical Zero-Inflated Negative Binomial
-    Regression with G-Computation (BaHZING) is an analysis tool used for
-    environmental mixture exposures and other mixture exposures with
-    hierarchical gut microbiome outcome data. BaHZING controls Type 1
-    error rates, multiple testing, stabilizes effect estimates with small
-    sample sizes and Estimated stable effects with a small sample sizes
-    and models the effects of a mixture of PFAS jointly on the gut
-    microbiome.
+Description: A Bayesian model for examining the association between
+    environmental mixtures and all Taxa measured in a hierarchical
+    microbiome dataset in a single integrated analysis. Compared with
+    analyzing the associations of environmental mixtures with each Taxa
+    individually, 'BaHZING' controls Type 1 error rates and provides more
+    stable effect estimates when dealing with small sample sizes.
 License: GPL (>= 3)
 Depends: 
     R (>= 4.1.0),
