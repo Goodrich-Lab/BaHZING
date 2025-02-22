@@ -7,3 +7,4 @@
 ^.RDataTmp$
 ^dev$
 ^cran-comments\.md$
+^CRAN-SUBMISSION$

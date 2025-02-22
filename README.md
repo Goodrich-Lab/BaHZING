@@ -26,14 +26,15 @@ exposures and gut microbiome outcomes.
 
 ## Installation
 
-You can install `BaHZING` from [CRAN](https://cran.r-project.org/) with:
+You can install `BaHZING` from
+[CRAN](https://cran.r-project.org/package=BaHZING) with:
 
 ``` r
-# install.packages("BaHZING")
+install.packages("BaHZING")
 ```
 
 Alternatively, you can install the development version of `BaHZING` from
-[GitHub](https://github.com/):
+[GitHub](https://github.com/Goodrich-Lab/BaHZING):
 
 ``` r
 # install.packages("pak")
