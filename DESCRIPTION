@@ -30,7 +30,8 @@ Imports:
     R2jags,
     stats,
     stringr,
-    tidyr
+    tidyr,
+    utils
 Suggests:
     testthat (>= 3.0.0)
 Config/testthat/edition: 3

@@ -37,7 +37,7 @@
 #' @import dplyr
 #' @import tidyr
 #' @import stringr
-#'
+#' @importFrom utils globalVariables
 #' @importFrom phyloseq sample_data otu_table tax_table
 #' @importFrom dplyr full_join select mutate %>%
 #' @importFrom tidyr unite
@@ -46,7 +46,7 @@
 #' @name Format_BaHZING
 
 # Declare global variables
-globalVariables(c("Domain"))
+utils::globalVariables(c("Domain"))
 
 Format_BaHZING <- function(phyloseq.object) {
   # Initialize variables to store taxonomic levels and ASV information

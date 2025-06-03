@@ -66,6 +66,21 @@ test_that("test BaHZING_Model", {
 
   testthat::expect_equal(object = ncol(results), expected = 11)
 
+
+  # ## BaH-ZING without informative prior ----
+  # results <- BaHZING_Model(formatted_data = formatted_data,
+  #                          covar = NULL,
+  #                          x = x,
+  #                          exposure_standardization = "standard_normal",
+  #                          n.chains = 1,
+  #                          n.adapt = 60,
+  #                          n.iter.burnin = 2,
+  #                          n.iter.sample= 2,
+  #                          counterfactual_profiles = c(-0.5, 0.5),
+  #                          q = 2)
+  #
+  # testthat::expect_equal(object = ncol(results), expected = 11)
+
   # Test Errors ----
 
   ## if counterfactual_profiles is a vector ----

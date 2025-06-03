@@ -7,6 +7,7 @@
 #' @import tidyr
 #' @import phyloseq
 #' @import stringr
+#' @importFrom utils globalVariables
 #' @importFrom stats quantile update
 #' @importFrom bayestestR p_direction p_rope p_map
 #' @param formatted_data An object containing formatted microbiome data.
@@ -15,11 +16,11 @@
 #' @param n.chains An optional integer specifying the number of parallel chains
 #' for the model in jags.model function. Default is 3.
 #' @param n.adapt An optional integer specifying the number of iterations for
-#' adaptation in jags.model function. Default is 5000.
+#' adaptation in jags.model function. Default is 100.
 #' @param n.iter.burnin An optional integer specifying number of iterations in
-#' update function. Default is 10000.
+#' update function. Default is 1,000.
 #' @param n.iter.sample An optional integer specifying the number of iterations
-#' in coda.samples function. Default is 10000.
+#' in coda.samples function. Default is 5,000.
 #' @param exposure_standardization Method for standardizing the exposures.
 #' Should be one of "standard_normal" (the default), "quantile", or "none". If
 #' "none", exposures are not standardized before analysis, and counterfactual
@@ -84,19 +85,19 @@
 
 # Declare global variables
 globalVariables(c("LibrarySize", "X2.5.", "X97.5.", "Mean",
-                         "Exposure.Index", "taxa_index", "taxa_full",
-                         "component", "estimate", "bci_lcl", "bci_ucl",
-                         "domain", "taxa_name", "pdir","prope","pmap",
-                         "name"))
+                  "Exposure.Index", "taxa_index", "taxa_full",
+                  "component", "estimate", "bci_lcl", "bci_ucl",
+                  "domain", "taxa_name", "pdir","prope","pmap",
+                  "name"))
 
 BaHZING_Model <- function(formatted_data,
                           x,
                           covar = NULL,
                           exposure_standardization = NULL,
                           n.chains = 3,
-                          n.adapt = 5000,
-                          n.iter.burnin = 10000,
-                          n.iter.sample = 10000,
+                          n.adapt = 100,
+                          n.iter.burnin = 1000,
+                          n.iter.sample = 5000,
                           counterfactual_profiles = NULL,
                           q = NULL,
                           verbose = TRUE,
@@ -246,7 +247,7 @@ BaHZING_Model <- function(formatted_data,
   L <- L %>%
     select(LibrarySize)
 
-  # 3. Return "Sanity" Messages ----
+  # 5. Return "Sanity" Messages ----
   if(verbose == TRUE){
     message("#### Checking input data ####")
     message("Exposure and Covariate Data:")
@@ -272,9 +273,10 @@ BaHZING_Model <- function(formatted_data,
     }
   }
 
-  # 4. Run Model ----
+  # 6. Run Model ----
   if (!is.null(covar)) {
-    # Hierarchical Model with covariates----
+    ## A. Model with covariates----
+
     BHRM.microbiome <-
       "model {
     for(r in 1:R) {
@@ -445,7 +447,8 @@ BaHZING_Model <- function(formatted_data,
 
   }"
 
-    # Run JAGs Estimation
+    ### Run JAGs Estimation ----
+    # set up for JAGs based on taxonomy
     jdata <- list(N=N, Y=Y, R=R, X.q=X.q, W=W, P=P, Q=Q,
                   GenusData=GenusData, Genus.R=Genus.R,
                   Family.R=Family.R, FamilyData=FamilyData,
@@ -453,6 +456,7 @@ BaHZING_Model <- function(formatted_data,
                   Class.R=Class.R, ClassData=ClassData,
                   Phylum.R=Phylum.R, PhylumData=PhylumData,
                   profiles=profiles,L=L)
+
     var.s <- c("species.beta", "genus.beta", "family.beta", "order.beta",
                "class.beta", "phylum.beta", "species.beta.zero",
                "genus.beta.zero", "family.beta.zero", "order.beta.zero",
@@ -461,12 +465,20 @@ BaHZING_Model <- function(formatted_data,
                "species.psi.zero","genus.psi.zero","family.psi.zero",
                "order.psi.zero","class.psi.zero","phylum.psi.zero",
                "omega","disp")
-    model.fit <- jags.model(file=textConnection(BHRM.microbiome), data=jdata, n.chains=n.chains, n.adapt=n.adapt, quiet=F)
+    model.fit <- jags.model(file=textConnection(BHRM.microbiome),
+                            data=jdata,
+                            n.chains=n.chains,
+                            n.adapt=n.adapt,
+                            quiet=F)
     update(model.fit, n.iter=n.iter.burnin, progress.bar="text")
-    model.fit <- coda.samples(model=model.fit, variable.names=var.s, n.iter=n.iter.sample, thin=1, progress.bar="text")
+    model.fit <- coda.samples(model=model.fit,
+                              variable.names=var.s,
+                              n.iter=n.iter.sample,
+                              thin=1,
+                              progress.bar="text")
 
   } else {
-    # Hierarchical Model without Covariates----
+    ## B. Model without Covariates----
     BHRM.microbiome <-
       "model {
     for(r in 1:R) {
@@ -637,14 +649,17 @@ BaHZING_Model <- function(formatted_data,
 
   }"
 
+
     # Run JAGs Estimation
-    jdata <- list(N=N, Y=Y, R=R, X.q=X.q, P=P,
-                  GenusData=GenusData, Genus.R=Genus.R,
-                  Family.R=Family.R, FamilyData=FamilyData,
-                  Order.R=Order.R, OrderData=OrderData,
-                  Class.R=Class.R, ClassData=ClassData,
-                  Phylum.R=Phylum.R, PhylumData=PhylumData,
-                  profiles=profiles,L=L)
+
+      jdata <- list(N=N, Y=Y, R=R, X.q=X.q, P=P,
+                    GenusData=GenusData, Genus.R=Genus.R,
+                    Family.R=Family.R, FamilyData=FamilyData,
+                    Order.R=Order.R, OrderData=OrderData,
+                    Class.R=Class.R, ClassData=ClassData,
+                    Phylum.R=Phylum.R, PhylumData=PhylumData,
+                    profiles=profiles,L=L)
+
     var.s <- c("species.beta", "genus.beta", "family.beta", "order.beta",
                "class.beta", "phylum.beta", "species.beta.zero",
                "genus.beta.zero", "family.beta.zero", "order.beta.zero",
@@ -660,7 +675,7 @@ BaHZING_Model <- function(formatted_data,
                               n.iter=n.iter.sample, thin=1, progress.bar="text")
   }
 
-  # 5. summarize results -------------------------------------------------------
+  # 7. summarize results -------------------------------------------------------
   ## Calculate Mean, SD, and quantiles ----
   r <- summary(model.fit)
   results <- data.frame(round(r$statistics[,1:2],3), round(r$quantiles[,c(1,5)],3))
