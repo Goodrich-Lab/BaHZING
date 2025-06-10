@@ -17,7 +17,7 @@
 #' @param q An integer specifying the number of quantiles.
 #' @param verbose If TRUE (default), function returns information a data quality
 #' check.
-#' @return A data frame containing results of the Bayesian analysis, with the
+#' @return A data frame containing results of the qgcomp analysis, with the
 #' following columns:
 #' - taxa_full: Full Taxa information, including all levels of the taxonomy.
 #' Taxanomic levels are split by two underscores ('__').
@@ -29,8 +29,8 @@
 #'   - "Count model estimate": From the conditional mean part (ZINB or Poisson).
 #'   - "Zero-inflated model estimate": From the structural zero part (ZINB only).
 #' - estimate: Point estimate of the parameter.
-#' - lcl: 95% Bayesian Credible Interval Lower Limit. Calculated as estimate - 1.96 × standard error
-#' - ucl: 95% Bayesian Credible Interval Upper Limit. Calculated as estimate + 1.96 × standard error.
+#' - lcl: 95% Interval Lower Limit. Calculated as estimate - 1.96 × standard error
+#' - ucl: 95% Interval Upper Limit. Calculated as estimate + 1.96 × standard error.
 #' - p_value: P-value for the hypothesis that the effect estimate equals zero.
 #' - model: Indicates the method used in the qgcomp() analysis.
 #'   - "ZINB": Zero-Inflated Negative Binomial model (from qgcomp.zi.boot()).
@@ -52,6 +52,8 @@ ZING_qgcomp <- function(formatted_data,
   if (!is.null(covar)){
     W <- data.frame(exposure_covar_dat[covar])
     Q <- ncol(W)
+  }else{
+    Q = 0
   }
 
   # Create exposure dataframe
@@ -99,7 +101,7 @@ ZING_qgcomp <- function(formatted_data,
     bind_cols(Y.o) %>%
     bind_cols(Y.c) %>%
     bind_cols(Y.p)
-
+  # outcome including different domains
   Y <- exposure_covar_dat[, grep("k__", names(exposure_covar_dat))]
   N <- nrow(Y)
   R <- ncol(Y)
@@ -110,6 +112,7 @@ ZING_qgcomp <- function(formatted_data,
     message("Exposure and Covariate Data:")
     message(paste0("- Total sample size: ", N))
     message(paste0("- Number of exposures: ", P))
+    message(paste0("- Number of covariates ", Q))
 
     message("Microbiome Data:")
     message(paste0("- Number of unique genus in data: ",  Genus.R))
@@ -138,7 +141,7 @@ ZING_qgcomp <- function(formatted_data,
         tryCatch({
           mod1 <- qgcomp.zi.noboot(f = m0, expnms = exposure, data = dat, q = q, dist = "negbin")
 
-          # Extract mixture estimates for count and zero-inflation
+          # Define function to Extract individual estimates for count and zero-inflation
           get_component_results <- function(mod1, comp, label) {
             sink("temp.txt")
             coef_mat <- summary(mod1$fit)$coefficients[[comp]]
@@ -156,8 +159,10 @@ ZING_qgcomp <- function(formatted_data,
               ucl = estimate + 1.96*sd
             )
           }
+          ind_means <- get_component_results(mod1, "count", "Count model coefficient")
+          ind_probs <- get_component_results(mod1, "zero", "Zero-inflation model coefficient")
 
-          # Combine mixture estimate and individual effects
+          # Extract mixture estimate for zero-inflation and count
           sink("temp.txt")
           mixture_means <- data.frame(
             taxa_full = r, exposure = "Mixture",
@@ -180,15 +185,15 @@ ZING_qgcomp <- function(formatted_data,
                    ucl = estimate + 1.96*sd)
           sink()
 
-          ind_means <- get_component_results(mod1, "count", "Count model coefficient")
-          ind_probs <- get_component_results(mod1, "zero", "Zero-inflation model coefficient")
 
+          # Combine mixture estimate and individual effects
           model_results <- rbind(mixture_means, ind_means, mixture_probs, ind_probs)
           model_results$model <- "ZINB"
 
         }, error = function(e) {
           # Handle convergence errors
-          if (grepl("glm.fit", conditionMessage(e))) {
+          if (grepl("glm.fit: algorithm did not converge", conditionMessage(e)) |
+              grepl("glm.fit: fitted probabilities numerically 0 or 1 occurred", conditionMessage(e))) {
             na_block <- function(comp) {
               data.frame(
                 taxa_full = c(r, rep(r, length(exposure))),
@@ -235,7 +240,7 @@ ZING_qgcomp <- function(formatted_data,
     }
 
     res <- map_dfr(colnames(Y),
-                   ~ZING_Model(.x, dat = exposure_covar_dat, exposure = x, covariates = covar, q = 4))
+                   ~ZING_Model(.x, dat = exposure_covar_dat, exposure = x, covariates = covar, q = q))
 
     # Adding domain
     res2 <- res %>% mutate(domain=case_when(grepl("_s__", taxa_full) ~ "Species",

@@ -37,10 +37,16 @@ test_that("test ZING_qgcomp", {
   results <- ZING_qgcomp(formatted_data = formatted_data,
                            covar = NULL,
                            x = x,
-                           q = 3)
+                           q = 4)
 
   testthat::expect_equal(object = ncol(results), expected = 10)
 
 
+  ## Test ZING_qgcomp with q = NULL ----
+  results <- ZING_qgcomp(formatted_data = formatted_data,
+                         covar = covar,
+                         x = x,
+                         q = NULL)
 
+  testthat::expect_equal(object = ncol(results), expected = 10)
 })
