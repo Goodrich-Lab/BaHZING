@@ -27,6 +27,8 @@ Imports:
     magrittr,
     phyloseq,
     pscl,
+    purrr,
+    qgcomp,
     R2jags,
     stats,
     stringr,
