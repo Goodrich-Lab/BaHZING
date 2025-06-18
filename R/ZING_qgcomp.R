@@ -115,6 +115,7 @@ ZING_qgcomp <- function(formatted_data,
     message(paste0("- Number of covariates ", Q))
 
     message("Microbiome Data:")
+    message(paste0("- Number of unique species in data: ",  dim(Y.s)[2]))
     message(paste0("- Number of unique genus in data: ",  Genus.R))
     message(paste0("- Number of unique family in data: ", Family.R))
     message(paste0("- Number of unique order in data: ",  Order.R))
