@@ -1,4 +1,4 @@
-test_that("test ZING_qgcomp", {
+test_that("test ZIP_qgcomp", {
   ### Load example data
   data("iHMP_Reduced_update")
 
@@ -8,11 +8,11 @@ test_that("test ZING_qgcomp", {
   ### Perform qgcomp with zero-inflated negative binomial regression/poisson regression
   ### Specify a mixture of exposures
   x <- c("soft_drinks_dietnum",
-         # "diet_soft_drinks_dietnum"
+         "diet_soft_drinks_dietnum"
          # "fruit_juice_dietnum","water_dietnum",Poisson Regression
          # "alcohol_dietnum","yogurt_dietnum","dairy_dietnum","probiotic_dietnum","fruits_no_juice_dietnum",
          # "vegetables_dietnum","beans_soy_dietnum","whole_grains_dietnum","starch_dietnum"
-         "eggs_dietnum"
+         # "eggs_dietnum"
          # "processed_meat_dietnum","red_meat_dietnum","white_meat_dietnum","shellfish_dietnum","fish_dietnum",
          # "sweets_dietnum"
          )
@@ -22,8 +22,8 @@ test_that("test ZING_qgcomp", {
   covar <- c("consent_age")
 
   # Test when it works -----
-  ## Test ZING_qgcomp with covariates ----
-  results <- ZING_qgcomp(formatted_data = formatted_data,
+  ## Test ZIP_qgcomp with covariates ----
+  results <- ZIP_qgcomp(formatted_data = formatted_data,
                            x = x,
                            covar = covar,
                            q = 4)
@@ -31,8 +31,8 @@ test_that("test ZING_qgcomp", {
   testthat::expect_equal(object = ncol(results), expected = 10)
 
 
-  ## Test ZING_qgcomp without covariates ----
-  results <- ZING_qgcomp(formatted_data = formatted_data,
+  ## Test ZIP_qgcomp without covariates ----
+  results <- ZIP_qgcomp(formatted_data = formatted_data,
                            covar = NULL,
                            x = x,
                            q = 4)
@@ -40,8 +40,8 @@ test_that("test ZING_qgcomp", {
   testthat::expect_equal(object = ncol(results), expected = 10)
 
 
-  ## Test ZING_qgcomp with q = NULL ----
-  results <- ZING_qgcomp(formatted_data = formatted_data,
+  ## Test ZIP_qgcomp with q = NULL ----
+  results <- ZIP_qgcomp(formatted_data = formatted_data,
                          covar = covar,
                          x = x,
                          q = NULL)

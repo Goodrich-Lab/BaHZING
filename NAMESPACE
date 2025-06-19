@@ -3,7 +3,7 @@
 export("%>%")
 export(BaHZING_Model)
 export(Format_BaHZING)
-export(ZING_qgcomp)
+export(ZIP_qgcomp)
 import(R2jags)
 import(dplyr)
 import(phyloseq)

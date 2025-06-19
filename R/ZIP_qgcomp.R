@@ -1,4 +1,4 @@
-#' ZING_qgcomp Function
+#' ZIP_qgcomp Function
 #' This function implements the BaHZING model for microbiome data analysis.
 #' @import R2jags
 #' @import rjags
@@ -33,13 +33,13 @@
 #' - ucl: 95% Interval Upper Limit. Calculated as estimate + 1.96 × standard error.
 #' - p_value: P-value for the hypothesis that the effect estimate equals zero.
 #' - model: Indicates the method used in the qgcomp() analysis.
-#'   - "ZINB": Zero-Inflated Negative Binomial model (from qgcomp.zi.boot()).
+#'   - "ZIP": Zero-Inflated Poisson model (from qgcomp.zi.boot()).
 #'   - "Poisson": Poisson regression model (from qgcomp()).
 #' @export
-#' @name ZING_qgcomp
+#' @name ZIP_qgcomp
 #'
 
-ZING_qgcomp <- function(formatted_data,
+ZIP_qgcomp <- function(formatted_data,
                         x,
                         covar = NULL,
                         q = NULL,
@@ -140,7 +140,7 @@ ZING_qgcomp <- function(formatted_data,
       if (min(dat[[r]]) == 0) {
         # Use Zero-Inflated Negative Binomial (ZINB)
         tryCatch({
-          mod1 <- qgcomp.zi.noboot(f = m0, expnms = exposure, data = dat, q = q, dist = "negbin")
+          mod1 <- qgcomp.zi.noboot(f = m0, expnms = exposure, data = dat, q = q, dist = "poisson")
 
           # Define function to Extract individual estimates for count and zero-inflation
           get_component_results <- function(mod1, comp, label) {
