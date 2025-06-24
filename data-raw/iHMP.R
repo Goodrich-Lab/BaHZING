@@ -202,34 +202,3 @@ iHMP_Reduced <- filterTaxaByPrevalence(iHMP, 0.97)
 # Save dataset
 usethis::use_data(iHMP_Reduced, overwrite = TRUE)
 
-# Alternative 4.
-
-filterTaxaByPrevalenceRange <- function(ps, min_percent = 0, max_percent = 1) {
-  # Total number of samples
-  n_samples <- nsamples(ps)
-
-  # Convert OTU table to a matrix
-  otu_mat <- as(otu_table(ps), "matrix")
-
-  # If taxa are rows, transpose the matrix
-  if (taxa_are_rows(ps)) {
-    otu_mat <- t(otu_mat)
-  }
-
-  # Compute how many samples each taxon is present in
-  prevalence_counts <- colSums(otu_mat > 0)
-
-  # Keep taxa that are present in a proportion between min_percent and max_percent
-  to_keep <- prevalence_counts >= (min_percent * n_samples) &
-    prevalence_counts <= (max_percent * n_samples)
-
-  # Prune and return filtered phyloseq object
-  ps_filtered <- prune_taxa(to_keep, ps)
-  return(ps_filtered)
-}
-
-
-
-iHMP_Reduced_update <- filterTaxaByPrevalenceRange(iHMP, 0.52, 0.53)
-
-usethis::use_data(iHMP_Reduced_update, overwrite = TRUE)

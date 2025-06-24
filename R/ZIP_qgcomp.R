@@ -25,15 +25,11 @@
 #' - domain: domain of the taxa.
 #' - exposure: Exposure name (either one of  the individual exposures, or the
 #' mixture).
-#' - component: Indicates the model component.
-#'   - "Count model estimate": From the conditional mean part (ZINB or Poisson).
-#'   - "Zero-inflated model estimate": From the structural zero part (ZINB only).
-#' - estimate: Point estimate of the parameter.
+#' - estimate: Point estimate or mixture estimate.
 #' - lcl: 95% Interval Lower Limit. Calculated as estimate - 1.96 × standard error
 #' - ucl: 95% Interval Upper Limit. Calculated as estimate + 1.96 × standard error.
 #' - p_value: P-value for the hypothesis that the effect estimate equals zero.
 #' - model: Indicates the method used in the qgcomp() analysis.
-#'   - "ZIP": Zero-Inflated Poisson model (from qgcomp.zi.boot()).
 #'   - "Poisson": Poisson regression model (from qgcomp()).
 #' @export
 #' @name ZIP_qgcomp
@@ -136,109 +132,38 @@ ZIP_qgcomp <- function(formatted_data,
       # Build the model formula
       formula_str <- paste0("`", r, "`", " ~ ", paste(c(exposure, covariates), collapse = " + "))
       m0 <- as.formula(formula_str)
-
-      if (min(dat[[r]]) == 0) {
-        # Use Zero-Inflated Negative Binomial (ZINB)
-        tryCatch({
-          mod1 <- qgcomp.zi.noboot(f = m0, expnms = exposure, data = dat, q = q, dist = "poisson")
-
-          # Define function to Extract individual estimates for count and zero-inflation
-          get_component_results <- function(mod1, comp, label) {
-            sink("temp.txt")
-            coef_mat <- summary(mod1$fit)$coefficients[[comp]]
-            sink()
-            exposures <- rownames(coef_mat)[2:(length(exposure)+1)]
-            data.frame(
-              taxa_full = r,
-              exposure = exposures,
-              estimate = coef_mat[2:(length(exposure)+1), 1],
-              sd = coef_mat[2:(length(exposure)+1), 2],
-              p_value = coef_mat[2:(length(exposure)+1), 4],
-              component = label
-            )%>%mutate(
-              lcl = estimate - 1.96*sd,
-              ucl = estimate + 1.96*sd
-            )
-          }
-          ind_means <- get_component_results(mod1, "count", "Count model coefficient")
-          ind_probs <- get_component_results(mod1, "zero", "Zero-inflation model coefficient")
-
-          # Extract mixture estimate for zero-inflation and count
-          sink("temp.txt")
-          mixture_means <- data.frame(
-            taxa_full = r, exposure = "Mixture",
-            estimate = mod1$coef$count[2],
-            sd = summary(mod1)$coeffients$count[2, "Std. Error"],
-            p_value = mod1$pval$count[2],
-            component = "Count model coefficient"
-          )%>%
-            mutate(lcl = estimate - 1.96*sd,
-                   ucl = estimate + 1.96*sd)
-
-          mixture_probs <- data.frame(
-            taxa_full = r, exposure = "Mixture",
-            estimate = mod1$coef$zero[2],
-            sd = summary(mod1)$coeffients$zero[2, 2],
-            p_value = mod1$pval$zero[2],
-            component = "Zero-inflation model coefficient"
-          ) %>%
-            mutate(lcl = estimate - 1.96*sd,
-                   ucl = estimate + 1.96*sd)
-          sink()
-
-
-          # Combine mixture estimate and individual effects
-          model_results <- rbind(mixture_means, ind_means, mixture_probs, ind_probs)
-          model_results$model <- "ZINB"
-
-        }, error = function(e) {
-          # Handle convergence errors
-          if (grepl("glm.fit: algorithm did not converge", conditionMessage(e)) |
-              grepl("glm.fit: fitted probabilities numerically 0 or 1 occurred", conditionMessage(e))) {
-            na_block <- function(comp) {
-              data.frame(
-                taxa_full = c(r, rep(r, length(exposure))),
-                exposure = c("Mixture", exposure),
-                estimate = NA, sd = NA,
-                lcl = NA, ucl = NA,
-                p_value = NA,
-                component = comp
-              )
-            }
-            model_results <- rbind(na_block("Count model coefficient"), na_block("Zero-inflation model coefficient"))
-            model_results$model <- "ZINB"
-          } else {
-            stop(e)
-          }
-        })
-
-      } else {
-        # Use Poisson
-        mod1 <- qgcomp(f = m0, expnms = exposure, data = dat, q = q, family = poisson())
-        coef_mat <- summary(mod1$fit)$coefficients
-        mixture <- data.frame(
-          taxa_full = r, exposure = "Mixture",
-          estimate = coef_mat[2, 1],
-          sd = coef_mat[2, 2],
-          p_value = coef_mat[2, 4],
-          component = "Count model coefficient"
+      # Use Poisson
+      mod1 <- qgcomp(f = m0, expnms = exposure, data = dat, q = q, family = poisson())
+      coef_mat <- summary(mod1$fit)$coefficients
+      mixture <- data.frame(
+        taxa_full = r, exposure = "Mixture",
+        estimate = coef_mat[2, 1],
+        sd = coef_mat[2, 2],
+        p_value = coef_mat[2, 4]
+      )%>%
+        mutate(
+          lcl = estimate - 1.96*sd,
+          ucl = estimate + 1.96*sd
         )
-        individual <- data.frame(
-          taxa_full = rep(r, length(exposure)),
-          exposure = exposure,
-          estimate = coef_mat[2:(length(exposure)+1), 1],
-          sd = coef_mat[2:(length(exposure)+1), 2],
-          p_value = coef_mat[2:(length(exposure)+1), 4],
-          component = "Count model coefficient"
-        )
-        model_results <- rbind(mixture, individual)
-        model_results$model <- "Poisson"
-      }
 
+      individual <- data.frame(
+        taxa_full = rep(r, length(exposure)),
+        exposure = exposure,
+        estimate = coef_mat[2:(length(exposure)+1), 1],
+        sd = coef_mat[2:(length(exposure)+1), 2],
+        p_value = coef_mat[2:(length(exposure)+1), 4]
+      ) %>%
+        mutate(
+          lcl = estimate - 1.96*sd,
+          ucl = estimate + 1.96*sd
+        )
+
+      model_results <- rbind(mixture, individual)
+      model_results$model <- "Poisson"
       rownames(model_results) <- NULL
 
       return(model_results)
-    }
+      }
 
     res <- map_dfr(colnames(Y),
                    ~ZING_Model(.x, dat = exposure_covar_dat, exposure = x, covariates = covar, q = q))
@@ -251,7 +176,7 @@ ZIP_qgcomp <- function(formatted_data,
                                             grepl("_c__", taxa_full)   ~ "Class",
                                             grepl("_p__", taxa_full)  ~ "Phylum"),
                            taxa_name = sub(".*__", "", taxa_full)) %>%
-      select(taxa_full, taxa_name, domain, exposure,component,
+      select(taxa_full, taxa_name, domain, exposure,
              estimate,lcl,ucl,p_value, model)
 
   return(res2)

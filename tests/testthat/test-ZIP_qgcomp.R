@@ -1,9 +1,9 @@
 test_that("test ZIP_qgcomp", {
   ### Load example data
-  data("iHMP_Reduced_update")
+  data("iHMP_Reduced")
 
   ### Format microbiome data
-  formatted_data <- Format_BaHZING(iHMP_Reduced_update)
+  formatted_data <- Format_BaHZING(iHMP_Reduced)
 
   ### Perform qgcomp with zero-inflated negative binomial regression/poisson regression
   ### Specify a mixture of exposures
@@ -28,7 +28,7 @@ test_that("test ZIP_qgcomp", {
                            covar = covar,
                            q = 4)
 
-  testthat::expect_equal(object = ncol(results), expected = 10)
+  testthat::expect_equal(object = ncol(results), expected = 9)
 
 
   ## Test ZIP_qgcomp without covariates ----
@@ -37,7 +37,7 @@ test_that("test ZIP_qgcomp", {
                            x = x,
                            q = 4)
 
-  testthat::expect_equal(object = ncol(results), expected = 10)
+  testthat::expect_equal(object = ncol(results), expected = 9)
 
 
   ## Test ZIP_qgcomp with q = NULL ----
@@ -46,5 +46,5 @@ test_that("test ZIP_qgcomp", {
                          x = x,
                          q = NULL)
 
-  testthat::expect_equal(object = ncol(results), expected = 10)
+  testthat::expect_equal(object = ncol(results), expected = 9)
 })
