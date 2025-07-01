@@ -201,3 +201,4 @@ iHMP_Reduced <- filterTaxaByPrevalence(iHMP, 0.97)
 
 # Save dataset
 usethis::use_data(iHMP_Reduced, overwrite = TRUE)
+

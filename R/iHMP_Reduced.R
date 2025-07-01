@@ -1,4 +1,4 @@
-#' iHMP_Reduced data
+#' iHMP_Reduced_update data
 #'
 #' A subset of data from the Integrative Human Microbiome Project
 #'

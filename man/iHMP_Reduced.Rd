@@ -3,7 +3,7 @@
 \docType{data}
 \name{iHMP_Reduced}
 \alias{iHMP_Reduced}
-\title{iHMP_Reduced data}
+\title{iHMP_Reduced_update data}
 \format{
 \subsection{\code{iHMP_Reduced}}{
 
