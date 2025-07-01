@@ -3,6 +3,7 @@
 export("%>%")
 export(BaHZING_Model)
 export(Format_BaHZING)
+export(Ridge_BaHZING_Model)
 export(ZIP_qgcomp)
 import(R2jags)
 import(dplyr)
