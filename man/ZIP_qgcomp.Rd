@@ -29,18 +29,12 @@ Taxanomic levels are split by two underscores ('__').
 \item domain: domain of the taxa.
 \item exposure: Exposure name (either one of  the individual exposures, or the
 mixture).
-\item component: Indicates the model component.
-\itemize{
-\item "Count model estimate": From the conditional mean part (ZINB or Poisson).
-\item "Zero-inflated model estimate": From the structural zero part (ZINB only).
-}
-\item estimate: Point estimate of the parameter.
+\item estimate: Point estimate or mixture estimate.
 \item lcl: 95\% Interval Lower Limit. Calculated as estimate - 1.96 × standard error
 \item ucl: 95\% Interval Upper Limit. Calculated as estimate + 1.96 × standard error.
 \item p_value: P-value for the hypothesis that the effect estimate equals zero.
 \item model: Indicates the method used in the qgcomp() analysis.
 \itemize{
-\item "ZIP": Zero-Inflated Poisson model (from qgcomp.zi.boot()).
 \item "Poisson": Poisson regression model (from qgcomp()).
 }
 }
