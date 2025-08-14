@@ -91,18 +91,18 @@ globalVariables(c("LibrarySize", "X2.5.", "X97.5.", "Mean",
                   "name"))
 
 Ridge_BaHZING_Model <- function(formatted_data,
-                          x,
-                          covar = NULL,
-                          exposure_standardization = NULL,
-                          n.chains = 3,
-                          n.adapt = 100,
-                          n.iter.burnin = 1000,
-                          n.iter.sample = 5000,
-                          counterfactual_profiles = NULL,
-                          q = NULL,
-                          verbose = TRUE,
-                          return_all_estimates = FALSE,
-                          ROPE_range = c(-0.1, 0.1)) {
+                                x,
+                                covar = NULL,
+                                exposure_standardization = NULL,
+                                n.chains = 3,
+                                n.adapt = 100,
+                                n.iter.burnin = 1000,
+                                n.iter.sample = 5000,
+                                counterfactual_profiles = NULL,
+                                q = NULL,
+                                verbose = TRUE,
+                                return_all_estimates = FALSE,
+                                ROPE_range = c(-0.1, 0.1)) {
 
   # 1. Check input data ----
   # Extract metadata file from formatted data
@@ -281,8 +281,12 @@ Ridge_BaHZING_Model <- function(formatted_data,
       "model {
     for(r in 1:R) {
       for(i in 1:N) {
+
+        # zero inflated nagative binomial
         Y[i,r] ~ dnegbin(mu[i,r], disp[r])
         mu[i,r] <- disp[r]/(disp[r]+(1-zero[i,r])*lambda[i,r]) - 0.000001*zero[i,r]
+
+        # mean component
         log(lambda[i,r]) <- alpha[r] + inprod(species.beta[r,1:P], X.q[i,1:P]) + inprod(delta[r, 1:Q], W[i,1:Q]) + log(L[i,1])
 
         # zero-inflation
@@ -296,8 +300,6 @@ Ridge_BaHZING_Model <- function(formatted_data,
       alpha[r] ~ dnorm(0, 1.0E-02)
       alpha.zero[r] ~ dnorm(0, 1.0E-02)
 
-      # prior on proportion of non-zeros
-      omega[r] ~ dunif(0,1)
 
       # prior on covariate effects
       for(q in 1:Q) {
@@ -307,20 +309,18 @@ Ridge_BaHZING_Model <- function(formatted_data,
 
       # prior on exposure effects
       for(p in 1:P) {
-        # species.beta.zero[r,p] ~ dnorm(0, 1.0E-02)
-        species.beta[r,p] ~ dnorm(mu.species[r,p], tau[r])
-        # mu.species[r,p] <- inprod(genus.beta[1:Genus.R,p], GenusData[r,1:Genus.R])
-        mu.species[r,p] <- 0
-
-        #Zero inflation component
-        species.beta.zero[r,p] ~ dnorm(mu.species.zero[r,p], tau[r])
-        # mu.species.zero[r,p] <- inprod(genus.beta.zero[1:Genus.R,p], GenusData[r,1:Genus.R])
-        mu.species.zero[r,p] <- 0
+        species.beta[r,p] ~ dnorm(0, tau[r]) # means component
+        species.beta.zero[r,p] ~ dnorm(0, tau.zero[r]) # zero inflation component
       }
 
-      # prior on precision
+      # prior on precision for exposure effects
+      # means component
       tau[r] <- 1/(sigma[r]*sigma[r])
       sigma[r] ~ dunif(0,3)
+
+      # zero inflation component
+      tau.zero[r] <- 1/(sigma.zero[r]*sigma.zero[r])
+      sigma.zero[r] ~ dunif(0,3)
 
       # g-estimation
       species.eta.low[r] <- inprod(species.beta[r,1:P], profiles[1,1:P])
@@ -335,18 +335,16 @@ Ridge_BaHZING_Model <- function(formatted_data,
     # Genus level
     for(g.r in 1:Genus.R) {
       for(p in 1:P) {
-        genus.beta[g.r,p] ~ dnorm(mu.family[g.r,p],genus.tau[g.r]) # should this be shared effects across exposures at genus level? or shared effects across all genus by exposure?
-        # mu.family[g.r,p] <- inprod(family.beta[1:Family.R,p], FamilyData[g.r,1:Family.R])
-        mu.family[g.r,p] <- 0
-
-        #Zero inflation component
-        genus.beta.zero[g.r,p] ~ dnorm(mu.family.zero[g.r,p],genus.tau[g.r]) # should this be shared effects across exposures at genus level? or shared effects across all genus by exposure?
-        # mu.family.zero[g.r,p] <- inprod(family.beta.zero[1:Family.R,p], FamilyData[g.r,1:Family.R])
-        mu.family.zero[g.r,p] <- 0
+        genus.beta[g.r,p] ~ dnorm(0,genus.tau[g.r]) # should this be shared effects across exposures at genus level? or shared effects across all genus by exposure?
+        genus.beta.zero[g.r,p] ~ dnorm(0,genus.tau.zero[g.r])
       }
       # prior on precision
       genus.tau[g.r] <- 1/(genus.sigma[g.r]*genus.sigma[g.r])
       genus.sigma[g.r] ~ dunif(0,3)
+
+      # zero inflation component
+      genus.tau.zero[g.r] <- 1/(genus.sigma.zero[g.r]*genus.sigma.zero[g.r])
+      genus.sigma.zero[g.r] ~ dunif(0,3)
 
       # g-estimation
       genus.eta.low[g.r] <- inprod(genus.beta[g.r,1:P], profiles[1,1:P])
@@ -361,18 +359,19 @@ Ridge_BaHZING_Model <- function(formatted_data,
     # Family level
     for(f.r in 1:Family.R) {
       for(p in 1:P) {
-        family.beta[f.r,p] ~ dnorm(mu.order[f.r,p], family.tau[f.r])
-        # mu.order[f.r,p] <- inprod(order.beta[1:Order.R,p], OrderData[f.r,1:Order.R])
-        mu.order[f.r,p] <- 0
+        family.beta[f.r,p] ~ dnorm(0, family.tau[f.r])
         #Zero inflation component
-        family.beta.zero[f.r,p] ~ dnorm(mu.order.zero[f.r,p], family.tau[f.r])
-        # mu.order.zero[f.r,p] <- inprod(order.beta.zero[1:Order.R,p], OrderData[f.r,1:Order.R])
-        mu.order.zero[f.r,p] <- 0
+        family.beta.zero[f.r,p] ~ dnorm(0, family.tau.zero[f.r])
 
       }
       # prior on precision
+      # means component
       family.tau[f.r] <- 1/(family.sigma[f.r]*family.sigma[f.r])
       family.sigma[f.r] ~ dunif(0,3)
+
+      # zero inflation component
+      family.tau.zero[f.r] <- 1/(family.sigma.zero[f.r]*family.sigma.zero[f.r])
+      family.sigma.zero[f.r] ~ dunif(0,3)
 
       # g-estimation
       family.eta.low[f.r] <- inprod(family.beta[f.r,1:P], profiles[1,1:P])
@@ -387,17 +386,19 @@ Ridge_BaHZING_Model <- function(formatted_data,
     # Order level
     for(o.r in 1:Order.R) {
       for(p in 1:P) {
-        order.beta[o.r,p] ~ dnorm(mu.class[o.r,p], order.tau[o.r])
-        # mu.class[o.r,p] <- inprod(class.beta[1:Class.R,p], ClassData[o.r,1:Class.R])
-        mu.class[o.r,p] <- 0
+        order.beta[o.r,p] ~ dnorm(0, order.tau[o.r])
+
         #Zero inflation component
-        order.beta.zero[o.r,p] ~ dnorm(mu.class.zero[o.r,p], order.tau[o.r])
-        # mu.class.zero[o.r,p] <- inprod(class.beta.zero[1:Class.R,p], ClassData[o.r,1:Class.R])
-        mu.class.zero[o.r,p] <- 0
+        order.beta.zero[o.r,p] ~ dnorm(0, order.tau.zero[o.r])
       }
+
       # prior on precision
       order.tau[o.r] <- 1/(order.sigma[o.r]*order.sigma[o.r])
       order.sigma[o.r] ~ dunif(0,3)
+
+      # zero inflation component
+      order.tau.zero[o.r] <- 1/(order.sigma.zero[o.r]*order.sigma.zero[o.r])
+      order.sigma.zero[o.r] ~ dunif(0,3)
 
       # g-estimation
       order.eta.low[o.r] <- inprod(order.beta[o.r,1:P], profiles[1,1:P])
@@ -412,19 +413,21 @@ Ridge_BaHZING_Model <- function(formatted_data,
     # Class level
     for(c.r in 1:Class.R) {
       for(p in 1:P) {
-        class.beta[c.r,p] ~ dnorm(mu.phylum[c.r,p], class.tau[c.r])
-        # mu.phylum[c.r,p] <- inprod(phylum.beta[1:Phylum.R,p], PhylumData[c.r,1:Phylum.R])
-        mu.phylum[c.r,p] <- 0
+        class.beta[c.r,p] ~ dnorm(0, class.tau[c.r])
         #Zero inflation component
-        class.beta.zero[c.r,p] ~ dnorm(mu.phylum.zero[c.r,p], class.tau[c.r])
-        # mu.phylum.zero[c.r,p] <- inprod(phylum.beta.zero[1:Phylum.R,p], PhylumData[c.r,1:Phylum.R])
-        mu.phylum.zero[c.r,p] <- 0
+        class.beta.zero[c.r,p] ~ dnorm(0, class.tau.zero[c.r])
       }
       # prior on precision
+      # means component
       class.tau[c.r] <- 1/(class.sigma[c.r]*class.sigma[c.r])
       class.sigma[c.r] ~ dunif(0,3)
 
+      # zero inflation component
+      class.tau.zero[c.r] <- 1/(class.sigma.zero[c.r]*class.sigma.zero[c.r])
+      class.sigma.zero[c.r] ~ dunif(0,3)
+
       # g-estimation
+      # means component
       class.eta.low[c.r] <- inprod(class.beta[c.r,1:P], profiles[1,1:P])
       class.eta.high[c.r] <- inprod(class.beta[c.r,1:P], profiles[2,1:P])
       class.psi[c.r] <- class.eta.high[c.r]-class.eta.low[c.r]
@@ -440,11 +443,14 @@ Ridge_BaHZING_Model <- function(formatted_data,
       for(p in 1:P) {
         phylum.beta[p.r,p] ~ dnorm(0, phylum.tau[p.r])
         #Zero inflation component
-        phylum.beta.zero[p.r,p] ~ dnorm(0, phylum.tau[p.r])
+        phylum.beta.zero[p.r,p] ~ dnorm(0, phylum.tau.zero[p.r])
       }
       # prior on precision
       phylum.tau[p.r] <- 1/(phylum.sigma[p.r]*phylum.sigma[p.r])
       phylum.sigma[p.r] ~ dunif(0,3)
+
+      phylum.tau.zero[p.r] <- 1/(phylum.sigma.zero[p.r]*phylum.sigma.zero[p.r])
+      phylum.sigma.zero[p.r] ~ dunif(0,3)
 
       # g-estimation
       phylum.eta.low[p.r] <- inprod(phylum.beta[p.r,1:P], profiles[1,1:P])
@@ -485,7 +491,7 @@ Ridge_BaHZING_Model <- function(formatted_data,
                "family.psi","order.psi","class.psi","phylum.psi",
                "species.psi.zero","genus.psi.zero","family.psi.zero",
                "order.psi.zero","class.psi.zero","phylum.psi.zero",
-               "omega","disp")
+               "disp")
     model.fit <- jags.model(file=textConnection(BHRM.microbiome),
                             data=jdata,
                             n.chains=n.chains,
@@ -506,6 +512,8 @@ Ridge_BaHZING_Model <- function(formatted_data,
       for(i in 1:N) {
         Y[i,r] ~ dnegbin(mu[i,r], disp[r])
         mu[i,r] <- disp[r]/(disp[r]+(1-zero[i,r])*lambda[i,r]) - 0.000001*zero[i,r]
+
+        # means component
         log(lambda[i,r]) <- alpha[r] + inprod(species.beta[r,1:P], X.q[i,1:P]) + log(L[i,1])
 
         # zero-inflation
@@ -519,30 +527,20 @@ Ridge_BaHZING_Model <- function(formatted_data,
       alpha[r] ~ dnorm(0, 1.0E-02)
       alpha.zero[r] ~ dnorm(0, 1.0E-02)
 
-      # prior on proportion of non-zeros
-      omega[r] ~ dunif(0,1)
-
-      # # prior on covariate effects
-      # for(q in 1:Q) {
-      #   delta[r,q] ~ dnorm(0, 1.0E-02)
-      #   delta.zero[r,q] ~ dnorm(0, 1.0E-02)
-      # }
-
       # prior on exposure effects
       for(p in 1:P) {
-        # species.beta.zero[r,p] ~ dnorm(0, 1.0E-02)
-        species.beta[r,p] ~ dnorm(mu.species[r,p], tau[r])
-        # mu.species[r,p] <- inprod(genus.beta[1:Genus.R,p], GenusData[r,1:Genus.R])
-        mu.species[r,p] <- 0
+        species.beta[r,p] ~ dnorm(0, tau[r])
         #Zero inflation component
-        species.beta.zero[r,p] ~ dnorm(mu.species.zero[r,p], tau[r])
-        # mu.species.zero[r,p] <- inprod(genus.beta.zero[1:Genus.R,p], GenusData[r,1:Genus.R])
-        mu.species.zero[r,p] <- 0
+        species.beta.zero[r,p] ~ dnorm(0, tau.zero[r])
       }
 
       # prior on precision
       tau[r] <- 1/(sigma[r]*sigma[r])
       sigma[r] ~ dunif(0,3)
+
+      # zero inflation component
+      tau.zero[r] <- 1/(sigma.zero[r]*sigma.zero[r])
+      sigma.zero[r] ~ dunif(0,3)
 
       # g-estimation
       species.eta.low[r] <- inprod(species.beta[r,1:P], profiles[1,1:P])
@@ -557,17 +555,18 @@ Ridge_BaHZING_Model <- function(formatted_data,
     # Genus level
     for(g.r in 1:Genus.R) {
       for(p in 1:P) {
-        genus.beta[g.r,p] ~ dnorm(mu.family[g.r,p],genus.tau[g.r]) # should this be shared effects across exposures at genus level? or shared effects across all genus by exposure?
-        # mu.family[g.r,p] <- inprod(family.beta[1:Family.R,p], FamilyData[g.r,1:Family.R])
-        mu.family[g.r,p] <- 0
+        genus.beta[g.r,p] ~ dnorm(0,genus.tau[g.r]) # should this be shared effects across exposures at genus level? or shared effects across all genus by exposure?
+
         #Zero inflation component
-        genus.beta.zero[g.r,p] ~ dnorm(mu.family.zero[g.r,p],genus.tau[g.r]) # should this be shared effects across exposures at genus level? or shared effects across all genus by exposure?
-        # mu.family.zero[g.r,p] <- inprod(family.beta.zero[1:Family.R,p], FamilyData[g.r,1:Family.R])
-        mu.family.zero[g.r,p] <- 0
+        genus.beta.zero[g.r,p] ~ dnorm(0,genus.tau.zero[g.r]) # should this be shared effects across exposures at genus level? or shared effects across all genus by exposure?
+
       }
       # prior on precision
       genus.tau[g.r] <- 1/(genus.sigma[g.r]*genus.sigma[g.r])
       genus.sigma[g.r] ~ dunif(0,3)
+
+      genus.tau.zero[g.r] <- 1/(genus.sigma.zero[g.r]*genus.sigma.zero[g.r])
+      genus.sigma.zero[g.r] ~ dunif(0,3)
 
       # g-estimation
       genus.eta.low[g.r] <- inprod(genus.beta[g.r,1:P], profiles[1,1:P])
@@ -582,18 +581,18 @@ Ridge_BaHZING_Model <- function(formatted_data,
     # Family level
     for(f.r in 1:Family.R) {
       for(p in 1:P) {
-        family.beta[f.r,p] ~ dnorm(mu.order[f.r,p], family.tau[f.r])
-        # mu.order[f.r,p] <- inprod(order.beta[1:Order.R,p], OrderData[f.r,1:Order.R])
-        mu.order[f.r,p] <- 0
-        #Zero inflation component
-        family.beta.zero[f.r,p] ~ dnorm(mu.order.zero[f.r,p], family.tau[f.r])
-        # mu.order.zero[f.r,p] <- inprod(order.beta.zero[1:Order.R,p], OrderData[f.r,1:Order.R])
-        mu.order.zero[f.r,p] <- 0
+        family.beta[f.r,p] ~ dnorm(0, family.tau[f.r])
 
+        #Zero inflation component
+        family.beta.zero[f.r,p] ~ dnorm(0, family.tau.zero[f.r])
       }
       # prior on precision
       family.tau[f.r] <- 1/(family.sigma[f.r]*family.sigma[f.r])
       family.sigma[f.r] ~ dunif(0,3)
+
+
+      family.tau.zero[f.r] <- 1/(family.sigma.zero[f.r]*family.sigma.zero[f.r])
+      family.sigma.zero[f.r] ~ dunif(0,3)
 
       # g-estimation
       family.eta.low[f.r] <- inprod(family.beta[f.r,1:P], profiles[1,1:P])
@@ -608,17 +607,17 @@ Ridge_BaHZING_Model <- function(formatted_data,
     # Order level
     for(o.r in 1:Order.R) {
       for(p in 1:P) {
-        order.beta[o.r,p] ~ dnorm(mu.class[o.r,p], order.tau[o.r])
-        # mu.class[o.r,p] <- inprod(class.beta[1:Class.R,p], ClassData[o.r,1:Class.R])
-        mu.class[o.r,p] <- 0
+        order.beta[o.r,p] ~ dnorm(0, order.tau[o.r])
+
         #Zero inflation component
-        order.beta.zero[o.r,p] ~ dnorm(mu.class.zero[o.r,p], order.tau[o.r])
-        # mu.class.zero[o.r,p] <- inprod(class.beta.zero[1:Class.R,p], ClassData[o.r,1:Class.R])
-        mu.class.zero[o.r,p] <- 0
+        order.beta.zero[o.r,p] ~ dnorm(0, order.tau.zero[o.r])
       }
       # prior on precision
       order.tau[o.r] <- 1/(order.sigma[o.r]*order.sigma[o.r])
       order.sigma[o.r] ~ dunif(0,3)
+
+      order.tau.zero[o.r] <- 1/(order.sigma.zero[o.r]*order.sigma.zero[o.r])
+      order.sigma.zero[o.r] ~ dunif(0,3)
 
       # g-estimation
       order.eta.low[o.r] <- inprod(order.beta[o.r,1:P], profiles[1,1:P])
@@ -633,17 +632,16 @@ Ridge_BaHZING_Model <- function(formatted_data,
     # Class level
     for(c.r in 1:Class.R) {
       for(p in 1:P) {
-        class.beta[c.r,p] ~ dnorm(mu.phylum[c.r,p], class.tau[c.r])
-        # mu.phylum[c.r,p] <- inprod(phylum.beta[1:Phylum.R,p], PhylumData[c.r,1:Phylum.R])
-        mu.phylum[c.r,p] <- 0
+        class.beta[c.r,p] ~ dnorm(0, class.tau[c.r])
         #Zero inflation component
-        class.beta.zero[c.r,p] ~ dnorm(mu.phylum.zero[c.r,p], class.tau[c.r])
-        # mu.phylum.zero[c.r,p] <- inprod(phylum.beta.zero[1:Phylum.R,p], PhylumData[c.r,1:Phylum.R])
-        mu.phylum.zero[c.r,p] <- 0
+        class.beta.zero[c.r,p] ~ dnorm(0, class.tau.zero[c.r])
       }
       # prior on precision
       class.tau[c.r] <- 1/(class.sigma[c.r]*class.sigma[c.r])
       class.sigma[c.r] ~ dunif(0,3)
+
+      class.tau.zero[c.r] <- 1/(class.sigma.zero[c.r]*class.sigma.zero[c.r])
+      class.sigma.zero[c.r] ~ dunif(0,3)
 
       # g-estimation
       class.eta.low[c.r] <- inprod(class.beta[c.r,1:P], profiles[1,1:P])
@@ -661,11 +659,14 @@ Ridge_BaHZING_Model <- function(formatted_data,
       for(p in 1:P) {
         phylum.beta[p.r,p] ~ dnorm(0, phylum.tau[p.r])
         #Zero inflation component
-        phylum.beta.zero[p.r,p] ~ dnorm(0, phylum.tau[p.r])
+        phylum.beta.zero[p.r,p] ~ dnorm(0, phylum.tau.zero[p.r])
       }
       # prior on precision
       phylum.tau[p.r] <- 1/(phylum.sigma[p.r]*phylum.sigma[p.r])
       phylum.sigma[p.r] ~ dunif(0,3)
+
+      phylum.tau.zero[p.r] <- 1/(phylum.sigma.zero[p.r]*phylum.sigma.zero[p.r])
+      phylum.sigma.zero[p.r] ~ dunif(0,3)
 
       # g-estimation
       phylum.eta.low[p.r] <- inprod(phylum.beta[p.r,1:P], profiles[1,1:P])
@@ -683,14 +684,14 @@ Ridge_BaHZING_Model <- function(formatted_data,
 
     # Run JAGs Estimation
 
-      jdata <- list(N=N, Y=Y, R=R, X.q=X.q, P=P,
-                    Genus.R=Genus.R,
-                    Family.R=Family.R,
-                    Order.R=Order.R,
-                    Class.R=Class.R,
-                    Phylum.R=Phylum.R,
-                    profiles=profiles,
-                    L=L)
+    jdata <- list(N=N, Y=Y, R=R, X.q=X.q, P=P,
+                  Genus.R=Genus.R,
+                  Family.R=Family.R,
+                  Order.R=Order.R,
+                  Class.R=Class.R,
+                  Phylum.R=Phylum.R,
+                  profiles=profiles,
+                  L=L)
 
     var.s <- c("species.beta", "genus.beta", "family.beta", "order.beta",
                "class.beta", "phylum.beta", "species.beta.zero",
@@ -699,7 +700,7 @@ Ridge_BaHZING_Model <- function(formatted_data,
                "family.psi","order.psi","class.psi","phylum.psi",
                "species.psi.zero","genus.psi.zero","family.psi.zero",
                "order.psi.zero","class.psi.zero","phylum.psi.zero",
-               "omega","disp")
+               "disp")
     model.fit <- jags.model(file=textConnection(BHRM.microbiome), data=jdata,
                             n.chains=n.chains, n.adapt=n.adapt, quiet=F)
     update(model.fit, n.iter=n.iter.burnin, progress.bar="text")
