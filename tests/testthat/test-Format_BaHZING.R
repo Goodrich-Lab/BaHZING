@@ -13,7 +13,9 @@ test_that("test Format_BaHZING", {
 
 test_that("Error thrown when taxonomic levels are less than 2", {
 
-  PS <- iHMP
+  data("iHMP_Reduced")
+
+  PS <- iHMP_Reduced
   # Modify the taxonomic table to have only one level
   tax_table(PS) <- tax_table(tax_table(PS)[,1])
 
@@ -23,7 +25,10 @@ test_that("Error thrown when taxonomic levels are less than 2", {
 
 
 test_that("If species level not present, create species column", {
-  PS <- iHMP
+
+  data("iHMP_Reduced")
+
+  PS <- iHMP_Reduced
   # phyloseq object without a 'Species' column
   tax_table(PS) <- tax_table(PS)[ , !colnames(tax_table(PS)) %in% "Species"]
 

@@ -51,7 +51,7 @@ exposure_standardization = "quantile". If exposure_standardization =
 check.}
 
 \item{return_all_estimates}{If FALSE (default), results do not include
-the dispersion and omega estimates from the BaHZING model.}
+the dispersion estimates from the BaHZING model.}
 
 \item{ROPE_range}{Region of practical equivalence (ROPE) for calculating
 p_rope. Default is c(-0.1, 0.1).}
