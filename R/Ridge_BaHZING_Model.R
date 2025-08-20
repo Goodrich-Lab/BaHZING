@@ -183,7 +183,7 @@ Ridge_BaHZING_Model <- function(formatted_data,
                       rep(counterfactual_profiles[2], P))
   }
 
-  # Give warning if using qualtiles but counterfactuals < 0
+  # Give warning if using quantiles but counterfactuals < 0
   if(exposure_standardization=="quantiles" &
      any(counterfactual_profiles<0 |
          counterfactual_profiles > q+1)){
@@ -449,6 +449,9 @@ Ridge_BaHZING_Model <- function(formatted_data,
       rownames_to_column("name")%>%
       # Combine results df with p-value df
       tidylog::left_join( p_value_df, by = "name")%>%
+      mutate(name = ifelse(grepl("beta", name)|grepl("psi", name),
+                           paste0("Species.", name),
+                           name)) %>%
       column_to_rownames("name")
 
 
@@ -509,6 +512,9 @@ Ridge_BaHZING_Model <- function(formatted_data,
       rownames_to_column("name")%>%
       # Combine results df with p-value df
       tidylog::left_join( p_value_df, by = "name")%>%
+      mutate(name = ifelse(grepl("beta", name)|grepl("psi", name),
+                           paste0("Genus.", name),
+                           name)) %>%
       column_to_rownames("name")
 
 
@@ -570,6 +576,9 @@ Ridge_BaHZING_Model <- function(formatted_data,
       rownames_to_column("name")%>%
       # Combine results df with p-value df
       tidylog::left_join( p_value_df, by = "name")%>%
+      mutate(name = ifelse(grepl("beta", name)|grepl("psi", name),
+                           paste0("Family.", name),
+                           name)) %>%
       column_to_rownames("name")
 
 
@@ -630,6 +639,9 @@ Ridge_BaHZING_Model <- function(formatted_data,
       rownames_to_column("name")%>%
       # Combine results df with p-value df
       tidylog::left_join( p_value_df, by = "name")%>%
+      mutate(name = ifelse(grepl("beta", name)|grepl("psi", name),
+                           paste0("Order.", name),
+                           name)) %>%
       column_to_rownames("name")
 
 
@@ -690,6 +702,9 @@ Ridge_BaHZING_Model <- function(formatted_data,
       rownames_to_column("name")%>%
       # Combine results df with p-value df
       tidylog::left_join( p_value_df, by = "name")%>%
+      mutate(name = ifelse(grepl("beta", name)|grepl("psi", name),
+                           paste0("Class.", name),
+                           name)) %>%
       column_to_rownames("name")
 
 
@@ -751,6 +766,9 @@ Ridge_BaHZING_Model <- function(formatted_data,
       rownames_to_column("name")%>%
       # Combine results df with p-value df
       tidylog::left_join( p_value_df, by = "name")%>%
+      mutate(name = ifelse(grepl("beta", name)|grepl("psi", name),
+                           paste0("Phylum.", name),
+                           name)) %>%
       column_to_rownames("name")
 
     ### Combine result for Species, Genus, Family, Order, Class, Phylum-----
@@ -819,6 +837,9 @@ Ridge_BaHZING_Model <- function(formatted_data,
       rownames_to_column("name")%>%
       # Combine results df with p-value df
       tidylog::left_join( p_value_df, by = "name")%>%
+      mutate(name = ifelse(grepl("beta", name)|grepl("psi", name),
+                           paste0("Species.", name),
+                           name)) %>%
       column_to_rownames("name")
 
 
@@ -879,6 +900,9 @@ Ridge_BaHZING_Model <- function(formatted_data,
       rownames_to_column("name")%>%
       # Combine results df with p-value df
       tidylog::left_join( p_value_df, by = "name")%>%
+      mutate(name = ifelse(grepl("beta", name)|grepl("psi", name),
+                           paste0("Genus.", name),
+                           name)) %>%
       column_to_rownames("name")
 
 
@@ -940,6 +964,9 @@ Ridge_BaHZING_Model <- function(formatted_data,
       rownames_to_column("name")%>%
       # Combine results df with p-value df
       tidylog::left_join( p_value_df, by = "name")%>%
+      mutate(name = ifelse(grepl("beta", name)|grepl("psi", name),
+                           paste0("Family.", name),
+                           name)) %>%
       column_to_rownames("name")
 
 
@@ -1000,6 +1027,9 @@ Ridge_BaHZING_Model <- function(formatted_data,
       rownames_to_column("name")%>%
       # Combine results df with p-value df
       tidylog::left_join( p_value_df, by = "name")%>%
+      mutate(name = ifelse(grepl("beta", name)|grepl("psi", name),
+                           paste0("Order.", name),
+                           name)) %>%
       column_to_rownames("name")
 
 
@@ -1060,6 +1090,9 @@ Ridge_BaHZING_Model <- function(formatted_data,
       rownames_to_column("name")%>%
       # Combine results df with p-value df
       tidylog::left_join( p_value_df, by = "name")%>%
+      mutate(name = ifelse(grepl("beta", name)|grepl("psi", name),
+                           paste0("Class.", name),
+                           name)) %>%
       column_to_rownames("name")
 
 
@@ -1121,6 +1154,9 @@ Ridge_BaHZING_Model <- function(formatted_data,
       rownames_to_column("name")%>%
       # Combine results df with p-value df
       tidylog::left_join( p_value_df, by = "name")%>%
+      mutate(name = ifelse(grepl("beta", name)|grepl("psi", name),
+                           paste0("Phylum.", name),
+                           name)) %>%
       column_to_rownames("name")
 
     ### Combine result for Species, Genus, Family, Order, Class, Phylum-----
@@ -1144,28 +1180,29 @@ Ridge_BaHZING_Model <- function(formatted_data,
   results <- results %>%
     mutate(taxa_index = str_remove(rownames(results),"..*\\[") %>%
              str_remove(.,",.*$") %>%
-             str_remove(.,"]"),
+             str_remove(.,"].*$") %>% as.numeric(),
            Exposure.Index = str_remove(rownames(results),"..*\\,"))%>%
     mutate(Exposure.Index=ifelse(
       grepl("disp",Exposure.Index)|
         grepl("psi",Exposure.Index),
       NA,Exposure.Index)) %>%
-    mutate(Exposure.Index = str_remove(Exposure.Index,"]")) %>%
+    mutate(Exposure.Index = suppressWarnings(str_remove(Exposure.Index,"]") %>%
+                                               as.numeric())) %>%
     mutate(
       taxa_full=case_when(
-        grepl("phylum",rownames(results)) ~ paste0(phylum[taxa_index]),
-        grepl("class"  ,rownames(results)) ~ paste0(class[taxa_index]),
-        grepl("order"  ,rownames(results)) ~ paste0(order[taxa_index]),
-        grepl("family" ,rownames(results)) ~ paste0(family[taxa_index]),
-        grepl("genus"  ,rownames(results)) ~ paste0(genus[taxa_index]),
-        grepl("species",rownames(results)) ~ paste0(species[taxa_index])),
+        grepl("Phylum", rownames(results)) ~ paste0(phylum[taxa_index]),
+        grepl("Class"  ,rownames(results)) ~ paste0(class[taxa_index]),
+        grepl("Order"  ,rownames(results)) ~ paste0(order[taxa_index]),
+        grepl("Family" ,rownames(results)) ~ paste0(family[taxa_index]),
+        grepl("Genus"  ,rownames(results)) ~ paste0(genus[taxa_index]),
+        grepl("Species",rownames(results)) ~ paste0(species[taxa_index])),
       domain=case_when(
-        grepl("phylum" ,rownames(results))  ~ "Phylum",
-        grepl("class"  ,rownames(results))   ~ "Class",
-        grepl("order"  ,rownames(results))   ~ "Order",
-        grepl("family" ,rownames(results))  ~ "Family",
-        grepl("genus"  ,rownames(results))   ~ "Genus",
-        grepl("species",rownames(results)) ~ "Species"),
+        grepl("Phylum" ,rownames(results))  ~ "Phylum",
+        grepl("Class"  ,rownames(results))   ~ "Class",
+        grepl("Order"  ,rownames(results))   ~ "Order",
+        grepl("Family" ,rownames(results))  ~ "Family",
+        grepl("Genus"  ,rownames(results))   ~ "Genus",
+        grepl("Species",rownames(results)) ~ "Species"),
       exposure=paste0(exposure[Exposure.Index])) %>%
     # Modify Exposure variable
     mutate(exposure=case_when(
