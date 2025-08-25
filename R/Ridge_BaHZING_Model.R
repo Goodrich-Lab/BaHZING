@@ -8,6 +8,7 @@
 #' @import phyloseq
 #' @import stringr
 #' @import tibble
+#' @import purrr
 #' @importFrom utils globalVariables
 #' @importFrom stats quantile update
 #' @importFrom bayestestR p_direction p_rope p_map
@@ -279,7 +280,7 @@ Ridge_BaHZING_Model <- function(formatted_data,
     }
   }
 
-  # 6. Model ----
+  # 6. Define Model ----
   ## a. With Covariates----
   Ridge_BHRM.microbiome <-
     "model {
@@ -389,786 +390,95 @@ Ridge_BaHZING_Model <- function(formatted_data,
       psi.zero[r] <- eta.high.zero[r]-eta.low.zero[r]
     }
   }"
-
-  # 7. Run Model ----
-  ## a. With Covariates----
-  if (!is.null(covar)) {
-    ### Run JAGs Estimation for species----
-    jdata <- list(N=N, Y=Y, P.s= R, X.q=X.q, P.e = P, W = W, Q = Q,
-                  profiles=profiles,
-                  L=L)
-
+  # 7. Define function to run models
+  run_bhrm_jags <- function(data, num, W = NULL, Q = NULL, jags_model_func, level = "Species") {
+    # Prepare data list
+    if (is.null(W)|is.null(Q)){
+      jdata <- list(N=N, Y=data, P.s=num, X.q=X.q, P.e=P,
+                    profiles=profiles, L=L)
+    }else{
+      jdata <- list(N=N, Y=data, P.s=num, X.q=X.q, P.e=P, W=W, Q=Q,
+                    profiles=profiles, L=L)
+    }
+    # Variables to monitor
     var.s <- c("beta", "beta.zero","psi","disp")
-    model.fit <- jags.model(file=textConnection( Ridge_BHRM.microbiome), data=jdata,
-                            n.chains=n.chains, n.adapt=n.adapt, quiet=F)
+
+    # Run JAGS model
+    model.fit <- jags.model(file=textConnection(jags_model_func),
+                            data=jdata, n.chains=n.chains, n.adapt=n.adapt, quiet=FALSE)
     update(model.fit, n.iter=n.iter.burnin, progress.bar="text")
     model.fit <- coda.samples(model=model.fit, variable.names=var.s,
                               n.iter=n.iter.sample, thin=1, progress.bar="text")
 
-    ### Summary result for species----
-    ### Calculate Mean, SD, and quantiles
+    # Summarize results
     r <- summary(model.fit)
-    results_species <- data.frame(round(r$statistics[,1:2],3), round(r$quantiles[,c(1,5)],3))
+    results <- data.frame(
+      round(r$statistics[,1:2],3),
+      round(r$quantiles[,c(1,5)],3)
+    )
 
-    ### Calculate p-values
-    post_dist <-  as.data.frame(model.fit[[1]])[, grep("beta|zero|psi", colnames(model.fit[[1]]))]
+    # Extract posterior draws
+    post_dist <- as.data.frame(model.fit[[1]])[, grep("beta|zero|psi", colnames(model.fit[[1]]))]
 
-    ### p_direction
-    pdir <- apply(post_dist, 2, function(x){
-      p_direction(x = x, threshold = 0.05) %>%
-        as.numeric()})
+    # Bayesian p-values
+    pdir <- apply(post_dist, 2, function(x) p_direction(x, threshold=0.05) %>% as.numeric())
+    prope <- apply(post_dist, 2, function(x) p_rope(x, rope=ROPE_range)$p_ROPE)
+    pmap <- apply(post_dist, 2, function(x) p_map(x) %>% as.numeric())
 
-    ### p_rope
-    prope <- apply(post_dist, 2, function(x){
-      p_rope(x = x, rope = ROPE_range)$p_ROPE})
+    p_value_df <- data.frame(name = names(pdir), pdir = pdir, prope = prope, pmap = pmap)
 
-    ### p_map
-    pmap <- apply(post_dist, 2, function(x){
-      p_map(x = x) %>%
-        as.numeric()})
-
-    # Get dataframe of p-values
-    p_value_df <- data.frame(name = names(pdir),
-                             pdir = pdir,
-                             prope = prope,
-                             pmap = pmap)
-
-    ## Create "component" variable
-    results_species <- results_species %>%
+    # Format results
+    results <- results %>%
       mutate(
-        component=case_when(
-          grepl("zero",rownames(.)) ~ "Zero-inflation model coefficients",
-          grepl("beta",rownames(.)) ~ "Count model coefficients",
-          grepl("psi",rownames(.))  ~ "Count model coefficients",
-          grepl("disp",rownames(.)) ~ "Dispersion",
-          TRUE ~ "Other"))%>%
-      # Calculate significance based on Bayesian Interval, rename variables (removed- jg 02_13_25 in place of p-values)
+        component = case_when(
+          grepl("zero", rownames(.)) ~ "Zero-inflation model coefficients",
+          grepl("beta", rownames(.)) ~ "Count model coefficients",
+          grepl("psi", rownames(.))  ~ "Count model coefficients",
+          grepl("disp", rownames(.)) ~ "Dispersion",
+          TRUE ~ "Other"
+        )
+      ) %>%
       rename(estimate = Mean,
              bci_lcl = X2.5.,
-             bci_ucl = X97.5.)%>%
-      rownames_to_column("name")%>%
-      # Combine results df with p-value df
-      tidylog::left_join( p_value_df, by = "name")%>%
+             bci_ucl = X97.5.) %>%
+      rownames_to_column("name") %>%
+      tidylog::left_join(p_value_df, by="name") %>%
       mutate(name = ifelse(grepl("beta", name)|grepl("psi", name),
-                           paste0("Species.", name),
+                           paste0(level, ".", name),
                            name)) %>%
       column_to_rownames("name")
 
-
-    ### Run JAGs Estimation for Genus----
-    jdata <- list(N=N, Y=GenusData, P.s=Genus.R, X.q=X.q, P.e = P, W = W, Q = Q,
-                  profiles=profiles,
-                  L=L)
-
-    var.s <- c("beta", "beta.zero","psi","disp")
-    model.fit <- jags.model(file=textConnection(Ridge_BHRM.microbiome), data=jdata,
-                            n.chains=n.chains, n.adapt=n.adapt, quiet=F)
-    update(model.fit, n.iter=n.iter.burnin, progress.bar="text")
-    model.fit <- coda.samples(model=model.fit, variable.names=var.s,
-                              n.iter=n.iter.sample, thin=1, progress.bar="text")
-
-    #### Summary result for Genus----
-    ### Calculate Mean, SD, and quantiles
-    r <- summary(model.fit)
-    results_Genus <- data.frame(round(r$statistics[,1:2],3), round(r$quantiles[,c(1,5)],3))
-
-    ### Calculate p-values
-    post_dist <-  as.data.frame(model.fit[[1]])[, grep("beta|zero|psi", colnames(model.fit[[1]]))]
-
-    ### p_direction
-    pdir <- apply(post_dist, 2, function(x){
-      p_direction(x = x, threshold = 0.05) %>%
-        as.numeric()})
-
-    ### p_rope
-    prope <- apply(post_dist, 2, function(x){
-      p_rope(x = x, rope = ROPE_range)$p_ROPE})
-
-    ### p_map
-    pmap <- apply(post_dist, 2, function(x){
-      p_map(x = x) %>%
-        as.numeric()})
-
-    # Get dataframe of p-values
-    p_value_df <- data.frame(name = names(pdir),
-                             pdir = pdir,
-                             prope = prope,
-                             pmap = pmap)
-
-    ## Create "component" variable
-    results_Genus <- results_Genus %>%
-      mutate(
-        component=case_when(
-          grepl("zero",rownames(.)) ~ "Zero-inflation model coefficients",
-          grepl("beta",rownames(.)) ~ "Count model coefficients",
-          grepl("psi",rownames(.))  ~ "Count model coefficients",
-          grepl("disp",rownames(.)) ~ "Dispersion",
-
-          TRUE ~ "Other"))%>%
-      # Calculate significance based on Bayesian Interval, rename variables (removed- jg 02_13_25 in place of p-values)
-      rename(estimate = Mean,
-             bci_lcl = X2.5.,
-             bci_ucl = X97.5.)%>%
-      rownames_to_column("name")%>%
-      # Combine results df with p-value df
-      tidylog::left_join( p_value_df, by = "name")%>%
-      mutate(name = ifelse(grepl("beta", name)|grepl("psi", name),
-                           paste0("Genus.", name),
-                           name)) %>%
-      column_to_rownames("name")
-
-
-
-    ### Run JAGs Estimation for Family----
-    jdata <- list(N = N, Y= FamilyData, P.s=Family.R, X.q=X.q, P.e = P, W = W, Q = Q,
-                  profiles=profiles,
-                  L = L)
-
-    var.s <- c("beta", "beta.zero","psi","disp")
-    model.fit <- jags.model(file=textConnection(Ridge_BHRM.microbiome), data=jdata,
-                            n.chains=n.chains, n.adapt=n.adapt, quiet=F)
-    update(model.fit, n.iter=n.iter.burnin, progress.bar="text")
-    model.fit <- coda.samples(model=model.fit, variable.names=var.s,
-                              n.iter=n.iter.sample, thin=1, progress.bar="text")
-
-    #### Summary result for Family----
-    ### Calculate Mean, SD, and quantiles
-    r <- summary(model.fit)
-    results_Family <- data.frame(round(r$statistics[,1:2],3), round(r$quantiles[,c(1,5)],3))
-
-    ### Calculate p-values
-    post_dist <-  as.data.frame(model.fit[[1]])[, grep("beta|zero|psi", colnames(model.fit[[1]]))]
-
-    ### p_direction
-    pdir <- apply(post_dist, 2, function(x){
-      p_direction(x = x, threshold = 0.05) %>%
-        as.numeric()})
-
-    ### p_rope
-    prope <- apply(post_dist, 2, function(x){
-      p_rope(x = x, rope = ROPE_range)$p_ROPE})
-
-    ### p_map
-    pmap <- apply(post_dist, 2, function(x){
-      p_map(x = x) %>%
-        as.numeric()})
-
-    # Get dataframe of p-values
-    p_value_df <- data.frame(name = names(pdir),
-                             pdir = pdir,
-                             prope = prope,
-                             pmap = pmap)
-
-    ## Create "component" variable
-    results_Family <- results_Family %>%
-      mutate(
-        component=case_when(
-          grepl("zero",rownames(.)) ~ "Zero-inflation model coefficients",
-          grepl("beta",rownames(.)) ~ "Count model coefficients",
-          grepl("psi",rownames(.))  ~ "Count model coefficients",
-          grepl("disp",rownames(.)) ~ "Dispersion",
-
-          TRUE ~ "Other"))%>%
-      # Calculate significance based on Bayesian Interval, rename variables (removed- jg 02_13_25 in place of p-values)
-      rename(estimate = Mean,
-             bci_lcl = X2.5.,
-             bci_ucl = X97.5.)%>%
-      rownames_to_column("name")%>%
-      # Combine results df with p-value df
-      tidylog::left_join( p_value_df, by = "name")%>%
-      mutate(name = ifelse(grepl("beta", name)|grepl("psi", name),
-                           paste0("Family.", name),
-                           name)) %>%
-      column_to_rownames("name")
-
-
-    ### Run JAGs Estimation for Order----
-    jdata <- list(N=N, Y=OrderData, P.s=Order.R, X.q=X.q, P.e = P,W = W, Q = Q,
-                  profiles=profiles,
-                  L=L)
-
-    var.s <- c("beta", "beta.zero","psi","disp")
-    model.fit <- jags.model(file=textConnection( Ridge_BHRM.microbiome), data=jdata,
-                            n.chains=n.chains, n.adapt=n.adapt, quiet=F)
-    update(model.fit, n.iter=n.iter.burnin, progress.bar="text")
-    model.fit <- coda.samples(model=model.fit, variable.names=var.s,
-                              n.iter=n.iter.sample, thin=1, progress.bar="text")
-
-    #### Summary result for Order----
-    ### Calculate Mean, SD, and quantiles
-    r <- summary(model.fit)
-    results_Order <- data.frame(round(r$statistics[,1:2],3), round(r$quantiles[,c(1,5)],3))
-
-    ### Calculate p-values
-    post_dist <-  as.data.frame(model.fit[[1]])[, grep("beta|zero|psi", colnames(model.fit[[1]]))]
-
-    ### p_direction
-    pdir <- apply(post_dist, 2, function(x){
-      p_direction(x = x, threshold = 0.05) %>%
-        as.numeric()})
-
-    ### p_rope
-    prope <- apply(post_dist, 2, function(x){
-      p_rope(x = x, rope = ROPE_range)$p_ROPE})
-
-    ### p_map
-    pmap <- apply(post_dist, 2, function(x){
-      p_map(x = x) %>%
-        as.numeric()})
-
-    # Get dataframe of p-values
-    p_value_df <- data.frame(name = names(pdir),
-                             pdir = pdir,
-                             prope = prope,
-                             pmap = pmap)
-
-    ## Create "component" variable
-    results_Order <- results_Order %>%
-      mutate(
-        component=case_when(
-          grepl("zero",rownames(.)) ~ "Zero-inflation model coefficients",
-          grepl("beta",rownames(.)) ~ "Count model coefficients",
-          grepl("psi",rownames(.))  ~ "Count model coefficients",
-          grepl("disp",rownames(.)) ~ "Dispersion",
-
-          TRUE ~ "Other"))%>%
-      # Calculate significance based on Bayesian Interval, rename variables (removed- jg 02_13_25 in place of p-values)
-      rename(estimate = Mean,
-             bci_lcl = X2.5.,
-             bci_ucl = X97.5.)%>%
-      rownames_to_column("name")%>%
-      # Combine results df with p-value df
-      tidylog::left_join( p_value_df, by = "name")%>%
-      mutate(name = ifelse(grepl("beta", name)|grepl("psi", name),
-                           paste0("Order.", name),
-                           name)) %>%
-      column_to_rownames("name")
-
-
-    ### Run JAGs Estimation for Class----
-    jdata <- list(N=N, Y=ClassData, P.s=Class.R, X.q=X.q, P.e = P,W = W, Q = Q,
-                  profiles=profiles,
-                  L=L)
-
-    var.s <- c("beta", "beta.zero","psi","disp")
-    model.fit <- jags.model(file=textConnection( Ridge_BHRM.microbiome), data=jdata,
-                            n.chains=n.chains, n.adapt=n.adapt, quiet=F)
-    update(model.fit, n.iter=n.iter.burnin, progress.bar="text")
-    model.fit <- coda.samples(model=model.fit, variable.names=var.s,
-                              n.iter=n.iter.sample, thin=1, progress.bar="text")
-
-    #### Summary result for Class----
-    ### Calculate Mean, SD, and quantiles
-    r <- summary(model.fit)
-    results_Class <- data.frame(round(r$statistics[,1:2],3), round(r$quantiles[,c(1,5)],3))
-
-    ### Calculate p-values
-    post_dist <-  as.data.frame(model.fit[[1]])[, grep("beta|zero|psi", colnames(model.fit[[1]]))]
-
-    ### p_direction
-    pdir <- apply(post_dist, 2, function(x){
-      p_direction(x = x, threshold = 0.05) %>%
-        as.numeric()})
-
-    ### p_rope
-    prope <- apply(post_dist, 2, function(x){
-      p_rope(x = x, rope = ROPE_range)$p_ROPE})
-
-    ### p_map
-    pmap <- apply(post_dist, 2, function(x){
-      p_map(x = x) %>%
-        as.numeric()})
-
-    # Get dataframe of p-values
-    p_value_df <- data.frame(name = names(pdir),
-                             pdir = pdir,
-                             prope = prope,
-                             pmap = pmap)
-
-    ## Create "component" variable
-    results_Class <- results_Class %>%
-      mutate(
-        component=case_when(
-          grepl("zero",rownames(.)) ~ "Zero-inflation model coefficients",
-          grepl("beta",rownames(.)) ~ "Count model coefficients",
-          grepl("psi",rownames(.))  ~ "Count model coefficients",
-          grepl("disp",rownames(.)) ~ "Dispersion",
-
-          TRUE ~ "Other"))%>%
-      # Calculate significance based on Bayesian Interval, rename variables (removed- jg 02_13_25 in place of p-values)
-      rename(estimate = Mean,
-             bci_lcl = X2.5.,
-             bci_ucl = X97.5.)%>%
-      rownames_to_column("name")%>%
-      # Combine results df with p-value df
-      tidylog::left_join( p_value_df, by = "name")%>%
-      mutate(name = ifelse(grepl("beta", name)|grepl("psi", name),
-                           paste0("Class.", name),
-                           name)) %>%
-      column_to_rownames("name")
-
-
-
-    ### Run JAGs Estimation for Phylum----
-    jdata <- list(N=N, Y=PhylumData, P.s=Phylum.R, X.q=X.q, P.e = P, W = W, Q = Q,
-                  profiles=profiles,
-                  L=L)
-
-    var.s <- c("beta", "beta.zero","psi","disp")
-    model.fit <- jags.model(file=textConnection( Ridge_BHRM.microbiome), data=jdata,
-                            n.chains=n.chains, n.adapt=n.adapt, quiet=F)
-    update(model.fit, n.iter=n.iter.burnin, progress.bar="text")
-    model.fit <- coda.samples(model=model.fit, variable.names=var.s,
-                              n.iter=n.iter.sample, thin=1, progress.bar="text")
-
-    #### Summary result for Phylum----
-    ### Calculate Mean, SD, and quantiles
-    r <- summary(model.fit)
-    results_Phylum <- data.frame(round(r$statistics[,1:2],3), round(r$quantiles[,c(1,5)],3))
-
-    ### Calculate p-values
-    post_dist <-  as.data.frame(model.fit[[1]])[, grep("beta|zero|psi", colnames(model.fit[[1]]))]
-
-    ### p_direction
-    pdir <- apply(post_dist, 2, function(x){
-      p_direction(x = x, threshold = 0.05) %>%
-        as.numeric()})
-
-    ### p_rope
-    prope <- apply(post_dist, 2, function(x){
-      p_rope(x = x, rope = ROPE_range)$p_ROPE})
-
-    ### p_map
-    pmap <- apply(post_dist, 2, function(x){
-      p_map(x = x) %>%
-        as.numeric()})
-
-    # Get dataframe of p-values
-    p_value_df <- data.frame(name = names(pdir),
-                             pdir = pdir,
-                             prope = prope,
-                             pmap = pmap)
-
-    ## Create "component" variable
-    results_Phylum <- results_Phylum %>%
-      mutate(
-        component=case_when(
-          grepl("zero",rownames(.)) ~ "Zero-inflation model coefficients",
-          grepl("beta",rownames(.)) ~ "Count model coefficients",
-          grepl("psi",rownames(.))  ~ "Count model coefficients",
-          grepl("disp",rownames(.)) ~ "Dispersion",
-
-          TRUE ~ "Other"))%>%
-      # Calculate significance based on Bayesian Interval, rename variables (removed- jg 02_13_25 in place of p-values)
-      rename(estimate = Mean,
-             bci_lcl = X2.5.,
-             bci_ucl = X97.5.)%>%
-      rownames_to_column("name")%>%
-      # Combine results df with p-value df
-      tidylog::left_join( p_value_df, by = "name")%>%
-      mutate(name = ifelse(grepl("beta", name)|grepl("psi", name),
-                           paste0("Phylum.", name),
-                           name)) %>%
-      column_to_rownames("name")
-
-    ### Combine result for Species, Genus, Family, Order, Class, Phylum-----
-    results <- results_species %>%
-      bind_rows(results_Genus)%>%
-      bind_rows(results_Family) %>%
-      bind_rows(results_Order) %>%
-      bind_rows(results_Class) %>%
-      bind_rows(results_Phylum)
-  }else{
-    ## b. Without covariates----
-    ### Run JAGs Estimation for species----
-    jdata <- list(N=N, Y=Y, P.s=R, X.q=X.q, P.e = P,
-                  profiles=profiles,
-                  L=L)
-
-    var.s <- c("beta", "beta.zero","psi","disp")
-    model.fit <- jags.model(file=textConnection( Ridge_BHRM_no_covariates.microbiome), data=jdata,
-                            n.chains=n.chains, n.adapt=n.adapt, quiet=F)
-    update(model.fit, n.iter=n.iter.burnin, progress.bar="text")
-    model.fit <- coda.samples(model=model.fit, variable.names=var.s,
-                              n.iter=n.iter.sample, thin=1, progress.bar="text")
-
-    ### Summary result for species----
-    ### Calculate Mean, SD, and quantiles
-    r <- summary(model.fit)
-    results_species <- data.frame(round(r$statistics[,1:2],3), round(r$quantiles[,c(1,5)],3))
-
-    ### Calculate p-values
-    post_dist <-  as.data.frame(model.fit[[1]])[, grep("beta|zero|psi", colnames(model.fit[[1]]))]
-
-    ### p_direction
-    pdir <- apply(post_dist, 2, function(x){
-      p_direction(x = x, threshold = 0.05) %>%
-        as.numeric()})
-
-    ### p_rope
-    prope <- apply(post_dist, 2, function(x){
-      p_rope(x = x, rope = ROPE_range)$p_ROPE})
-
-    ### p_map
-    pmap <- apply(post_dist, 2, function(x){
-      p_map(x = x) %>%
-        as.numeric()})
-
-    # Get dataframe of p-values
-    p_value_df <- data.frame(name = names(pdir),
-                             pdir = pdir,
-                             prope = prope,
-                             pmap = pmap)
-
-    ## Create "component" variable
-    results_species <- results_species %>%
-      mutate(
-        component=case_when(
-          grepl("zero",rownames(.)) ~ "Zero-inflation model coefficients",
-          grepl("beta",rownames(.)) ~ "Count model coefficients",
-          grepl("psi",rownames(.))  ~ "Count model coefficients",
-          grepl("disp",rownames(.)) ~ "Dispersion",
-
-          TRUE ~ "Other"))%>%
-      # Calculate significance based on Bayesian Interval, rename variables (removed- jg 02_13_25 in place of p-values)
-      rename(estimate = Mean,
-             bci_lcl = X2.5.,
-             bci_ucl = X97.5.)%>%
-      rownames_to_column("name")%>%
-      # Combine results df with p-value df
-      tidylog::left_join( p_value_df, by = "name")%>%
-      mutate(name = ifelse(grepl("beta", name)|grepl("psi", name),
-                           paste0("Species.", name),
-                           name)) %>%
-      column_to_rownames("name")
-
-
-    ### Run JAGs Estimation for Genus----
-    jdata <- list(N=N, Y=GenusData, P.s=Genus.R, X.q=X.q, P.e = P,
-                  profiles=profiles,
-                  L=L)
-
-    var.s <- c("beta", "beta.zero","psi","disp")
-    model.fit <- jags.model(file=textConnection( Ridge_BHRM_no_covariates.microbiome), data=jdata,
-                            n.chains=n.chains, n.adapt=n.adapt, quiet=F)
-    update(model.fit, n.iter=n.iter.burnin, progress.bar="text")
-    model.fit <- coda.samples(model=model.fit, variable.names=var.s,
-                              n.iter=n.iter.sample, thin=1, progress.bar="text")
-
-    #### Summary result for Genus----
-    ### Calculate Mean, SD, and quantiles
-    r <- summary(model.fit)
-    results_Genus <- data.frame(round(r$statistics[,1:2],3), round(r$quantiles[,c(1,5)],3))
-
-    ### Calculate p-values
-    post_dist <-  as.data.frame(model.fit[[1]])[, grep("beta|zero|psi", colnames(model.fit[[1]]))]
-
-    ### p_direction
-    pdir <- apply(post_dist, 2, function(x){
-      p_direction(x = x, threshold = 0.05) %>%
-        as.numeric()})
-
-    ### p_rope
-    prope <- apply(post_dist, 2, function(x){
-      p_rope(x = x, rope = ROPE_range)$p_ROPE})
-
-    ### p_map
-    pmap <- apply(post_dist, 2, function(x){
-      p_map(x = x) %>%
-        as.numeric()})
-
-    # Get dataframe of p-values
-    p_value_df <- data.frame(name = names(pdir),
-                             pdir = pdir,
-                             prope = prope,
-                             pmap = pmap)
-
-    ## Create "component" variable
-    results_Genus <- results_Genus %>%
-      mutate(
-        component=case_when(
-          grepl("zero",rownames(.)) ~ "Zero-inflation model coefficients",
-          grepl("beta",rownames(.)) ~ "Count model coefficients",
-          grepl("psi",rownames(.))  ~ "Count model coefficients",
-          grepl("disp",rownames(.)) ~ "Dispersion",
-
-          TRUE ~ "Other"))%>%
-      # Calculate significance based on Bayesian Interval, rename variables (removed- jg 02_13_25 in place of p-values)
-      rename(estimate = Mean,
-             bci_lcl = X2.5.,
-             bci_ucl = X97.5.)%>%
-      rownames_to_column("name")%>%
-      # Combine results df with p-value df
-      tidylog::left_join( p_value_df, by = "name")%>%
-      mutate(name = ifelse(grepl("beta", name)|grepl("psi", name),
-                           paste0("Genus.", name),
-                           name)) %>%
-      column_to_rownames("name")
-
-
-
-    ### Run JAGs Estimation for Family----
-    jdata <- list(N=N, Y=FamilyData, P.s=Family.R, X.q=X.q, P.e = P,
-                  profiles=profiles,
-                  L=L)
-
-    var.s <- c("beta", "beta.zero","psi","disp")
-    model.fit <- jags.model(file=textConnection( Ridge_BHRM_no_covariates.microbiome), data=jdata,
-                            n.chains=n.chains, n.adapt=n.adapt, quiet=F)
-    update(model.fit, n.iter=n.iter.burnin, progress.bar="text")
-    model.fit <- coda.samples(model=model.fit, variable.names=var.s,
-                              n.iter=n.iter.sample, thin=1, progress.bar="text")
-
-    #### Summary result for Family----
-    ### Calculate Mean, SD, and quantiles
-    r <- summary(model.fit)
-    results_Family <- data.frame(round(r$statistics[,1:2],3), round(r$quantiles[,c(1,5)],3))
-
-    ### Calculate p-values
-    post_dist <-  as.data.frame(model.fit[[1]])[, grep("beta|zero|psi", colnames(model.fit[[1]]))]
-
-    ### p_direction
-    pdir <- apply(post_dist, 2, function(x){
-      p_direction(x = x, threshold = 0.05) %>%
-        as.numeric()})
-
-    ### p_rope
-    prope <- apply(post_dist, 2, function(x){
-      p_rope(x = x, rope = ROPE_range)$p_ROPE})
-
-    ### p_map
-    pmap <- apply(post_dist, 2, function(x){
-      p_map(x = x) %>%
-        as.numeric()})
-
-    # Get dataframe of p-values
-    p_value_df <- data.frame(name = names(pdir),
-                             pdir = pdir,
-                             prope = prope,
-                             pmap = pmap)
-
-    ## Create "component" variable
-    results_Family <- results_Family %>%
-      mutate(
-        component=case_when(
-          grepl("zero",rownames(.)) ~ "Zero-inflation model coefficients",
-          grepl("beta",rownames(.)) ~ "Count model coefficients",
-          grepl("psi",rownames(.))  ~ "Count model coefficients",
-          grepl("disp",rownames(.)) ~ "Dispersion",
-
-          TRUE ~ "Other"))%>%
-      # Calculate significance based on Bayesian Interval, rename variables (removed- jg 02_13_25 in place of p-values)
-      rename(estimate = Mean,
-             bci_lcl = X2.5.,
-             bci_ucl = X97.5.)%>%
-      rownames_to_column("name")%>%
-      # Combine results df with p-value df
-      tidylog::left_join( p_value_df, by = "name")%>%
-      mutate(name = ifelse(grepl("beta", name)|grepl("psi", name),
-                           paste0("Family.", name),
-                           name)) %>%
-      column_to_rownames("name")
-
-
-    ### Run JAGs Estimation for Order----
-    jdata <- list(N=N, Y=OrderData, P.s=Order.R, X.q=X.q, P.e = P,
-                  profiles=profiles,
-                  L=L)
-
-    var.s <- c("beta", "beta.zero","psi","disp")
-    model.fit <- jags.model(file=textConnection( Ridge_BHRM_no_covariates.microbiome), data=jdata,
-                            n.chains=n.chains, n.adapt=n.adapt, quiet=F)
-    update(model.fit, n.iter=n.iter.burnin, progress.bar="text")
-    model.fit <- coda.samples(model=model.fit, variable.names=var.s,
-                              n.iter=n.iter.sample, thin=1, progress.bar="text")
-
-    #### Summary result for Order----
-    ### Calculate Mean, SD, and quantiles
-    r <- summary(model.fit)
-    results_Order <- data.frame(round(r$statistics[,1:2],3), round(r$quantiles[,c(1,5)],3))
-
-    ### Calculate p-values
-    post_dist <-  as.data.frame(model.fit[[1]])[, grep("beta|zero|psi", colnames(model.fit[[1]]))]
-
-    ### p_direction
-    pdir <- apply(post_dist, 2, function(x){
-      p_direction(x = x, threshold = 0.05) %>%
-        as.numeric()})
-
-    ### p_rope
-    prope <- apply(post_dist, 2, function(x){
-      p_rope(x = x, rope = ROPE_range)$p_ROPE})
-
-    ### p_map
-    pmap <- apply(post_dist, 2, function(x){
-      p_map(x = x) %>%
-        as.numeric()})
-
-    # Get dataframe of p-values
-    p_value_df <- data.frame(name = names(pdir),
-                             pdir = pdir,
-                             prope = prope,
-                             pmap = pmap)
-
-    ## Create "component" variable
-    results_Order <- results_Order %>%
-      mutate(
-        component=case_when(
-          grepl("zero",rownames(.)) ~ "Zero-inflation model coefficients",
-          grepl("beta",rownames(.)) ~ "Count model coefficients",
-          grepl("psi",rownames(.))  ~ "Count model coefficients",
-          grepl("disp",rownames(.)) ~ "Dispersion",
-
-          TRUE ~ "Other"))%>%
-      # Calculate significance based on Bayesian Interval, rename variables (removed- jg 02_13_25 in place of p-values)
-      rename(estimate = Mean,
-             bci_lcl = X2.5.,
-             bci_ucl = X97.5.)%>%
-      rownames_to_column("name")%>%
-      # Combine results df with p-value df
-      tidylog::left_join( p_value_df, by = "name")%>%
-      mutate(name = ifelse(grepl("beta", name)|grepl("psi", name),
-                           paste0("Order.", name),
-                           name)) %>%
-      column_to_rownames("name")
-
-
-    ### Run JAGs Estimation for Class----
-    jdata <- list(N=N, Y=ClassData, P.s=Class.R, X.q=X.q, P.e = P,
-                  profiles=profiles,
-                  L=L)
-
-    var.s <- c("beta", "beta.zero","psi","disp")
-    model.fit <- jags.model(file=textConnection( Ridge_BHRM_no_covariates.microbiome), data=jdata,
-                            n.chains=n.chains, n.adapt=n.adapt, quiet=F)
-    update(model.fit, n.iter=n.iter.burnin, progress.bar="text")
-    model.fit <- coda.samples(model=model.fit, variable.names=var.s,
-                              n.iter=n.iter.sample, thin=1, progress.bar="text")
-
-    #### Summary result for Class----
-    ### Calculate Mean, SD, and quantiles
-    r <- summary(model.fit)
-    results_Class <- data.frame(round(r$statistics[,1:2],3), round(r$quantiles[,c(1,5)],3))
-
-    ### Calculate p-values
-    post_dist <-  as.data.frame(model.fit[[1]])[, grep("beta|zero|psi", colnames(model.fit[[1]]))]
-
-    ### p_direction
-    pdir <- apply(post_dist, 2, function(x){
-      p_direction(x = x, threshold = 0.05) %>%
-        as.numeric()})
-
-    ### p_rope
-    prope <- apply(post_dist, 2, function(x){
-      p_rope(x = x, rope = ROPE_range)$p_ROPE})
-
-    ### p_map
-    pmap <- apply(post_dist, 2, function(x){
-      p_map(x = x) %>%
-        as.numeric()})
-
-    # Get dataframe of p-values
-    p_value_df <- data.frame(name = names(pdir),
-                             pdir = pdir,
-                             prope = prope,
-                             pmap = pmap)
-
-    ## Create "component" variable
-    results_Class <- results_Class %>%
-      mutate(
-        component=case_when(
-          grepl("zero",rownames(.)) ~ "Zero-inflation model coefficients",
-          grepl("beta",rownames(.)) ~ "Count model coefficients",
-          grepl("psi",rownames(.))  ~ "Count model coefficients",
-          grepl("disp",rownames(.)) ~ "Dispersion",
-
-          TRUE ~ "Other"))%>%
-      # Calculate significance based on Bayesian Interval, rename variables (removed- jg 02_13_25 in place of p-values)
-      rename(estimate = Mean,
-             bci_lcl = X2.5.,
-             bci_ucl = X97.5.)%>%
-      rownames_to_column("name")%>%
-      # Combine results df with p-value df
-      tidylog::left_join( p_value_df, by = "name")%>%
-      mutate(name = ifelse(grepl("beta", name)|grepl("psi", name),
-                           paste0("Class.", name),
-                           name)) %>%
-      column_to_rownames("name")
-
-
-
-    ### Run JAGs Estimation for Phylum----
-    jdata <- list(N=N, Y=PhylumData, P.s=Phylum.R, X.q=X.q, P.e = P,
-                  profiles=profiles,
-                  L=L)
-
-    var.s <- c("beta", "beta.zero","psi","disp")
-    model.fit <- jags.model(file=textConnection( Ridge_BHRM_no_covariates.microbiome), data=jdata,
-                            n.chains=n.chains, n.adapt=n.adapt, quiet=F)
-    update(model.fit, n.iter=n.iter.burnin, progress.bar="text")
-    model.fit <- coda.samples(model=model.fit, variable.names=var.s,
-                              n.iter=n.iter.sample, thin=1, progress.bar="text")
-
-    #### Summary result for Phylum----
-    ### Calculate Mean, SD, and quantiles
-    r <- summary(model.fit)
-    results_Phylum <- data.frame(round(r$statistics[,1:2],3), round(r$quantiles[,c(1,5)],3))
-
-    ### Calculate p-values
-    post_dist <-  as.data.frame(model.fit[[1]])[, grep("beta|zero|psi", colnames(model.fit[[1]]))]
-
-    ### p_direction
-    pdir <- apply(post_dist, 2, function(x){
-      p_direction(x = x, threshold = 0.05) %>%
-        as.numeric()})
-
-    ### p_rope
-    prope <- apply(post_dist, 2, function(x){
-      p_rope(x = x, rope = ROPE_range)$p_ROPE})
-
-    ### p_map
-    pmap <- apply(post_dist, 2, function(x){
-      p_map(x = x) %>%
-        as.numeric()})
-
-    # Get dataframe of p-values
-    p_value_df <- data.frame(name = names(pdir),
-                             pdir = pdir,
-                             prope = prope,
-                             pmap = pmap)
-
-    ## Create "component" variable
-    results_Phylum <- results_Phylum %>%
-      mutate(
-        component=case_when(
-          grepl("zero",rownames(.)) ~ "Zero-inflation model coefficients",
-          grepl("beta",rownames(.)) ~ "Count model coefficients",
-          grepl("psi",rownames(.))  ~ "Count model coefficients",
-          grepl("disp",rownames(.)) ~ "Dispersion",
-
-          TRUE ~ "Other"))%>%
-      # Calculate significance based on Bayesian Interval, rename variables (removed- jg 02_13_25 in place of p-values)
-      rename(estimate = Mean,
-             bci_lcl = X2.5.,
-             bci_ucl = X97.5.)%>%
-      rownames_to_column("name")%>%
-      # Combine results df with p-value df
-      tidylog::left_join( p_value_df, by = "name")%>%
-      mutate(name = ifelse(grepl("beta", name)|grepl("psi", name),
-                           paste0("Phylum.", name),
-                           name)) %>%
-      column_to_rownames("name")
-
-    ### Combine result for Species, Genus, Family, Order, Class, Phylum-----
-    results <- results_species %>%
-      bind_rows(results_Genus)%>%
-      bind_rows(results_Family) %>%
-      bind_rows(results_Order) %>%
-      bind_rows(results_Class) %>%
-      bind_rows(results_Phylum)
+    return(results)
   }
 
-  # 8. Format output data----
+  # 8. Run Model ----
+  # Data list
+  data_list <- list(
+    Species = list(data = Y, num = R),
+    Genus = list(data = GenusData, num = Genus.R),
+    Family = list(data = FamilyData, num = Family.R),
+    Order = list(data = OrderData, num = Order.R),
+    Class = list(data = ClassData, num = Class.R),
+    Phylum = list(data = PhylumData, num = Phylum.R)
+  )
+  # Functions
+  jags_func <- if (!is.null(covar)) {
+    Ridge_BHRM.microbiome
+  } else {
+    Ridge_BHRM_no_covariates.microbiome
+  }
+
+  # Run models
+  results <- map2(data_list, names(data_list), ~ run_bhrm_jags(
+    data = .x$data,
+    num = .x$num,
+    W = if (!is.null(covar)) W else NULL,
+    Q = if (!is.null(covar)) Q else NULL,
+    jags_model_func = jags_func,
+    level = .y
+  ))%>% bind_rows()
+
+  # 9. Format output data----
   phylum   <- colnames(PhylumData)
   class    <- colnames(ClassData)
   order    <- colnames(OrderData)
