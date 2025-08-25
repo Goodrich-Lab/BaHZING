@@ -7,6 +7,8 @@
 #' @import tidyr
 #' @import phyloseq
 #' @import stringr
+#' @import tibble
+#' @import purrr
 #' @importFrom utils globalVariables
 #' @importFrom stats quantile update
 #' @importFrom bayestestR p_direction p_rope p_map
@@ -45,7 +47,7 @@
 #' @param verbose If TRUE (default), function returns information a data quality
 #' check.
 #' @param return_all_estimates If FALSE (default), results do not include
-#' the dispersion and omega estimates from the BaHZING model.
+#' the dispersion estimates from the BaHZING model.
 #' @param ROPE_range Region of practical equivalence (ROPE) for calculating
 #' p_rope. Default is c(-0.1, 0.1).
 #' @return A data frame containing results of the Bayesian analysis, with the
@@ -91,18 +93,18 @@ globalVariables(c("LibrarySize", "X2.5.", "X97.5.", "Mean",
                   "name"))
 
 Ridge_BaHZING_Model <- function(formatted_data,
-                          x,
-                          covar = NULL,
-                          exposure_standardization = NULL,
-                          n.chains = 3,
-                          n.adapt = 100,
-                          n.iter.burnin = 1000,
-                          n.iter.sample = 5000,
-                          counterfactual_profiles = NULL,
-                          q = NULL,
-                          verbose = TRUE,
-                          return_all_estimates = FALSE,
-                          ROPE_range = c(-0.1, 0.1)) {
+                                x,
+                                covar = NULL,
+                                exposure_standardization = NULL,
+                                n.chains = 3,
+                                n.adapt = 100,
+                                n.iter.burnin = 1000,
+                                n.iter.sample = 5000,
+                                counterfactual_profiles = NULL,
+                                q = NULL,
+                                verbose = TRUE,
+                                return_all_estimates = FALSE,
+                                ROPE_range = c(-0.1, 0.1)) {
 
   # 1. Check input data ----
   # Extract metadata file from formatted data
@@ -182,7 +184,7 @@ Ridge_BaHZING_Model <- function(formatted_data,
                       rep(counterfactual_profiles[2], P))
   }
 
-  # Give warning if using qualtiles but counterfactuals < 0
+  # Give warning if using quantiles but counterfactuals < 0
   if(exposure_standardization=="quantiles" &
      any(counterfactual_profiles<0 |
          counterfactual_profiles > q+1)){
@@ -220,25 +222,29 @@ Ridge_BaHZING_Model <- function(formatted_data,
   N <- nrow(Y)
   R <- ncol(Y)
   #Genus
-  GenusData <- as.data.frame(t(formatted_data$Species.Genus.Matrix))
+  Z.s.g <- t(formatted_data$Species.Genus.Matrix)
+  GenusData <- as.matrix(Y) %*% Z.s.g %>% as.data.frame()
   Genus.R <- ncol(GenusData)
-  numGenusPerSpecies <- as.numeric(apply(GenusData, 1, sum))
+
   #Family
-  FamilyData <- as.data.frame(t(formatted_data$Genus.Family.Matrix))
+  Z.g.f <- t(formatted_data$Genus.Family.Matrix)
+  FamilyData <- as.matrix(GenusData) %*% Z.g.f %>% as.data.frame()
   Family.R <- ncol(FamilyData)
-  numFamilyPerGenus <- as.numeric(apply(FamilyData, 1, sum))
+
   #Order
-  OrderData <- as.data.frame(t(formatted_data$Family.Order.Matrix))
+  Z.f.o <- t(formatted_data$Family.Order.Matrix)
+  OrderData <- as.matrix(FamilyData) %*% Z.f.o %>% as.data.frame()
   Order.R <- ncol(OrderData)
-  numOrderPerorder <- as.numeric(apply(OrderData, 1, sum))
+
   #Class
-  ClassData <- as.data.frame(t(formatted_data$Order.Class.Matrix))
+  Z.o.c <- t(formatted_data$Order.Class.Matrix)
+  ClassData <- as.matrix(OrderData) %*% Z.o.c %>% as.data.frame()
   Class.R <- ncol(ClassData)
-  numClassPerOrder <- as.numeric(apply(ClassData, 1, sum))
+
   #Phylum
-  PhylumData <- as.data.frame(t(formatted_data$Class.Phylum.Matrix))
+  Z.c.p <- t(formatted_data$Class.Phylum.Matrix)
+  PhylumData <- as.matrix(ClassData) %*% Z.c.p %>% as.data.frame()
   Phylum.R <- ncol(PhylumData)
-  numPhylumPerClass <- as.numeric(apply(PhylumData, 1, sum))
 
   ## Create Library Size Offset
   L <- exposure_covar_dat[, grep("k__", names(exposure_covar_dat))]
@@ -255,6 +261,7 @@ Ridge_BaHZING_Model <- function(formatted_data,
     message(paste0("- Number of exposures: ", P))
 
     message("Microbiome Data:")
+    message(paste0("- Number of unique species in data: ",  R))
     message(paste0("- Number of unique genus in data: ",  Genus.R))
     message(paste0("- Number of unique family in data: ", Family.R))
     message(paste0("- Number of unique order in data: ",  Order.R))
@@ -273,518 +280,205 @@ Ridge_BaHZING_Model <- function(formatted_data,
     }
   }
 
-  # 6. Run Model ----
-  if (!is.null(covar)) {
-    ## A. Model with covariates----
+  # 6. Define Model ----
+  ## a. With Covariates----
+  Ridge_BHRM.microbiome <-
+    "model {
+    for(r in 1:P.s) { # for each feature (species, genus, family, etc.)
+      for(i in 1:N) { # loop through individuals
 
-    BHRM.microbiome <-
-      "model {
-    for(r in 1:R) {
-      for(i in 1:N) {
+        # zero inflated negative binomial
         Y[i,r] ~ dnegbin(mu[i,r], disp[r])
         mu[i,r] <- disp[r]/(disp[r]+(1-zero[i,r])*lambda[i,r]) - 0.000001*zero[i,r]
-        log(lambda[i,r]) <- alpha[r] + inprod(species.beta[r,1:P], X.q[i,1:P]) + inprod(delta[r, 1:Q], W[i,1:Q]) + log(L[i,1])
 
-        # zero-inflation
+        # means component
+        log(lambda[i,r]) <- alpha[r] + inprod(beta[r,1:P.e], X.q[i,1:P.e]) + inprod(delta[r, 1:Q], W[i,1:Q]) + log(L[i,1])
+
+        # zero inflation component
         zero[i,r] ~ dbern(pi[i,r])
-        logit(pi[i,r]) <- alpha.zero[r] + inprod(species.beta.zero[r,1:P], X.q[i,1:P]) + inprod(delta.zero[r, 1:Q], W[i,1:Q]) + log(L[i,1])
+        logit(pi[i,r]) <- alpha.zero[r] + inprod(beta.zero[r,1:P.e], X.q[i,1:P.e]) + inprod(delta.zero[r, 1:Q], W[i,1:Q]) + log(L[i,1])
       }
       # prior on dispersion parameter
       disp[r] ~ dunif(0,50)
 
       # prior on intercept
-      alpha[r] ~ dnorm(0, 1.0E-02)
-      alpha.zero[r] ~ dnorm(0, 1.0E-02)
-
-      # prior on proportion of non-zeros
-      omega[r] ~ dunif(0,1)
+      alpha[r] ~ dnorm(0, 1.0E-02) # means component
+      alpha.zero[r] ~ dnorm(0, 1.0E-02) # zero inflation component
 
       # prior on covariate effects
       for(q in 1:Q) {
-        delta[r,q] ~ dnorm(0, 1.0E-02)
-        delta.zero[r,q] ~ dnorm(0, 1.0E-02)
+        delta[r,q] ~ dnorm(0, 1.0E-02) # means component
+        delta.zero[r,q] ~ dnorm(0, 1.0E-02) # zero inflation component
       }
 
       # prior on exposure effects
-      for(p in 1:P) {
-        # species.beta.zero[r,p] ~ dnorm(0, 1.0E-02)
-        species.beta[r,p] ~ dnorm(mu.species[r,p], tau[r])
-        # mu.species[r,p] <- inprod(genus.beta[1:Genus.R,p], GenusData[r,1:Genus.R])
-        mu.species[r,p] <- 0
-
-        #Zero inflation component
-        species.beta.zero[r,p] ~ dnorm(mu.species.zero[r,p], tau[r])
-        # mu.species.zero[r,p] <- inprod(genus.beta.zero[1:Genus.R,p], GenusData[r,1:Genus.R])
-        mu.species.zero[r,p] <- 0
+      for(p in 1:P.e) {
+        beta[r,p] ~ dnorm(0, tau[r]) # means component
+        beta.zero[r,p] ~ dnorm(0, tau.zero[r]) # zero inflation component
       }
 
-      # prior on precision
+      # prior on precision for exposure effects
+      # means component
       tau[r] <- 1/(sigma[r]*sigma[r])
       sigma[r] ~ dunif(0,3)
 
-      # g-estimation
-      species.eta.low[r] <- inprod(species.beta[r,1:P], profiles[1,1:P])
-      species.eta.high[r] <- inprod(species.beta[r,1:P], profiles[2,1:P])
-      species.psi[r] <- species.eta.high[r]-species.eta.low[r]
-      # zero-inflation
-      species.eta.low.zero[r] <- inprod(species.beta.zero[r,1:P], profiles[1,1:P])
-      species.eta.high.zero[r] <- inprod(species.beta.zero[r,1:P], profiles[2,1:P])
-      species.psi.zero[r] <- species.eta.high.zero[r]-species.eta.low.zero[r]
-    }
-
-    # Genus level
-    for(g.r in 1:Genus.R) {
-      for(p in 1:P) {
-        genus.beta[g.r,p] ~ dnorm(mu.family[g.r,p],genus.tau[g.r]) # should this be shared effects across exposures at genus level? or shared effects across all genus by exposure?
-        # mu.family[g.r,p] <- inprod(family.beta[1:Family.R,p], FamilyData[g.r,1:Family.R])
-        mu.family[g.r,p] <- 0
-
-        #Zero inflation component
-        genus.beta.zero[g.r,p] ~ dnorm(mu.family.zero[g.r,p],genus.tau[g.r]) # should this be shared effects across exposures at genus level? or shared effects across all genus by exposure?
-        # mu.family.zero[g.r,p] <- inprod(family.beta.zero[1:Family.R,p], FamilyData[g.r,1:Family.R])
-        mu.family.zero[g.r,p] <- 0
-      }
-      # prior on precision
-      genus.tau[g.r] <- 1/(genus.sigma[g.r]*genus.sigma[g.r])
-      genus.sigma[g.r] ~ dunif(0,3)
+      # zero inflation component
+      tau.zero[r] <- 1/(sigma.zero[r]*sigma.zero[r])
+      sigma.zero[r] ~ dunif(0,3)
 
       # g-estimation
-      genus.eta.low[g.r] <- inprod(genus.beta[g.r,1:P], profiles[1,1:P])
-      genus.eta.high[g.r] <- inprod(genus.beta[g.r,1:P], profiles[2,1:P])
-      genus.psi[g.r] <- genus.eta.high[g.r]-genus.eta.low[g.r]
-      #zero inflation
-      genus.eta.low.zero[g.r] <- inprod(genus.beta.zero[g.r,1:P], profiles[1,1:P])
-      genus.eta.high.zero[g.r] <- inprod(genus.beta.zero[g.r,1:P], profiles[2,1:P])
-      genus.psi.zero[g.r] <- genus.eta.high.zero[g.r]-genus.eta.low.zero[g.r]
+      # means component
+      eta.low[r] <- inprod(beta[r,1:P.e], profiles[1,1:P.e])
+      eta.high[r] <- inprod(beta[r,1:P.e], profiles[2,1:P.e])
+      psi[r] <- eta.high[r]-eta.low[r]
+
+      # zero inflation component
+      eta.low.zero[r] <- inprod(beta.zero[r,1:P.e], profiles[1,1:P.e])
+      eta.high.zero[r] <- inprod(beta.zero[r,1:P.e], profiles[2,1:P.e])
+      psi.zero[r] <- eta.high.zero[r]-eta.low.zero[r]
     }
-
-    # Family level
-    for(f.r in 1:Family.R) {
-      for(p in 1:P) {
-        family.beta[f.r,p] ~ dnorm(mu.order[f.r,p], family.tau[f.r])
-        # mu.order[f.r,p] <- inprod(order.beta[1:Order.R,p], OrderData[f.r,1:Order.R])
-        mu.order[f.r,p] <- 0
-        #Zero inflation component
-        family.beta.zero[f.r,p] ~ dnorm(mu.order.zero[f.r,p], family.tau[f.r])
-        # mu.order.zero[f.r,p] <- inprod(order.beta.zero[1:Order.R,p], OrderData[f.r,1:Order.R])
-        mu.order.zero[f.r,p] <- 0
-
-      }
-      # prior on precision
-      family.tau[f.r] <- 1/(family.sigma[f.r]*family.sigma[f.r])
-      family.sigma[f.r] ~ dunif(0,3)
-
-      # g-estimation
-      family.eta.low[f.r] <- inprod(family.beta[f.r,1:P], profiles[1,1:P])
-      family.eta.high[f.r] <- inprod(family.beta[f.r,1:P], profiles[2,1:P])
-      family.psi[f.r] <- family.eta.high[f.r]-family.eta.low[f.r]
-      #zero inflation
-      family.eta.low.zero[f.r] <- inprod(family.beta.zero[f.r,1:P], profiles[1,1:P])
-      family.eta.high.zero[f.r] <- inprod(family.beta.zero[f.r,1:P], profiles[2,1:P])
-      family.psi.zero[f.r] <- family.eta.high.zero[f.r]-family.eta.low.zero[f.r]
-    }
-
-    # Order level
-    for(o.r in 1:Order.R) {
-      for(p in 1:P) {
-        order.beta[o.r,p] ~ dnorm(mu.class[o.r,p], order.tau[o.r])
-        # mu.class[o.r,p] <- inprod(class.beta[1:Class.R,p], ClassData[o.r,1:Class.R])
-        mu.class[o.r,p] <- 0
-        #Zero inflation component
-        order.beta.zero[o.r,p] ~ dnorm(mu.class.zero[o.r,p], order.tau[o.r])
-        # mu.class.zero[o.r,p] <- inprod(class.beta.zero[1:Class.R,p], ClassData[o.r,1:Class.R])
-        mu.class.zero[o.r,p] <- 0
-      }
-      # prior on precision
-      order.tau[o.r] <- 1/(order.sigma[o.r]*order.sigma[o.r])
-      order.sigma[o.r] ~ dunif(0,3)
-
-      # g-estimation
-      order.eta.low[o.r] <- inprod(order.beta[o.r,1:P], profiles[1,1:P])
-      order.eta.high[o.r] <- inprod(order.beta[o.r,1:P], profiles[2,1:P])
-      order.psi[o.r] <- order.eta.high[o.r]-order.eta.low[o.r]
-      #zero infl
-      order.eta.low.zero[o.r] <- inprod(order.beta.zero[o.r,1:P], profiles[1,1:P])
-      order.eta.high.zero[o.r] <- inprod(order.beta.zero[o.r,1:P], profiles[2,1:P])
-      order.psi.zero[o.r] <- order.eta.high.zero[o.r]-order.eta.low.zero[o.r]
-    }
-
-    # Class level
-    for(c.r in 1:Class.R) {
-      for(p in 1:P) {
-        class.beta[c.r,p] ~ dnorm(mu.phylum[c.r,p], class.tau[c.r])
-        # mu.phylum[c.r,p] <- inprod(phylum.beta[1:Phylum.R,p], PhylumData[c.r,1:Phylum.R])
-        mu.phylum[c.r,p] <- 0
-        #Zero inflation component
-        class.beta.zero[c.r,p] ~ dnorm(mu.phylum.zero[c.r,p], class.tau[c.r])
-        # mu.phylum.zero[c.r,p] <- inprod(phylum.beta.zero[1:Phylum.R,p], PhylumData[c.r,1:Phylum.R])
-        mu.phylum.zero[c.r,p] <- 0
-      }
-      # prior on precision
-      class.tau[c.r] <- 1/(class.sigma[c.r]*class.sigma[c.r])
-      class.sigma[c.r] ~ dunif(0,3)
-
-      # g-estimation
-      class.eta.low[c.r] <- inprod(class.beta[c.r,1:P], profiles[1,1:P])
-      class.eta.high[c.r] <- inprod(class.beta[c.r,1:P], profiles[2,1:P])
-      class.psi[c.r] <- class.eta.high[c.r]-class.eta.low[c.r]
-
-      #zero component
-      class.eta.low.zero[c.r] <- inprod(class.beta.zero[c.r,1:P], profiles[1,1:P])
-      class.eta.high.zero[c.r] <- inprod(class.beta.zero[c.r,1:P], profiles[2,1:P])
-      class.psi.zero[c.r] <- class.eta.high.zero[c.r]-class.eta.low.zero[c.r]
-    }
-
-    # Phylum level
-    for(p.r in 1:Phylum.R) {
-      for(p in 1:P) {
-        phylum.beta[p.r,p] ~ dnorm(0, phylum.tau[p.r])
-        #Zero inflation component
-        phylum.beta.zero[p.r,p] ~ dnorm(0, phylum.tau[p.r])
-      }
-      # prior on precision
-      phylum.tau[p.r] <- 1/(phylum.sigma[p.r]*phylum.sigma[p.r])
-      phylum.sigma[p.r] ~ dunif(0,3)
-
-      # g-estimation
-      phylum.eta.low[p.r] <- inprod(phylum.beta[p.r,1:P], profiles[1,1:P])
-      phylum.eta.high[p.r] <- inprod(phylum.beta[p.r,1:P], profiles[2,1:P])
-      phylum.psi[p.r] <- phylum.eta.high[p.r]-phylum.eta.low[p.r]
-
-      #Zero inflation
-      phylum.eta.low.zero[p.r] <- inprod(phylum.beta.zero[p.r,1:P], profiles[1,1:P])
-      phylum.eta.high.zero[p.r] <- inprod(phylum.beta.zero[p.r,1:P], profiles[2,1:P])
-      phylum.psi.zero[p.r] <- phylum.eta.high.zero[p.r]-phylum.eta.low.zero[p.r]
-    }
-
   }"
 
-    ### Run JAGs Estimation ----
-    # set up for JAGs based on taxonomy
-    # jdata <- list(N=N, Y=Y, R=R, X.q=X.q, W=W, P=P, Q=Q,
-    #               GenusData=GenusData, Genus.R=Genus.R,
-    #               Family.R=Family.R, FamilyData=FamilyData,
-    #               Order.R=Order.R, OrderData=OrderData,
-    #               Class.R=Class.R, ClassData=ClassData,
-    #               Phylum.R=Phylum.R, PhylumData=PhylumData,
-    #               profiles=profiles,L=L)
+  ## b. Without Covariates ----
+  Ridge_BHRM_no_covariates.microbiome <-
+    "model {
+    for(r in 1:P.s) { # for each feature (species, genus, family, etc.)
+      for(i in 1:N) { # loop through individuals
+        # zero inflated negative binomial
 
-    jdata <- list(N=N, Y=Y, R=R, X.q=X.q, W=W, P=P, Q=Q,
-                  Genus.R=Genus.R,
-                  Family.R=Family.R,
-                  Order.R=Order.R,
-                  Class.R=Class.R,
-                  Phylum.R=Phylum.R,
-                  profiles=profiles,
-                  L=L)
-
-    var.s <- c("species.beta", "genus.beta", "family.beta", "order.beta",
-               "class.beta", "phylum.beta", "species.beta.zero",
-               "genus.beta.zero", "family.beta.zero", "order.beta.zero",
-               "class.beta.zero", "phylum.beta.zero","species.psi","genus.psi",
-               "family.psi","order.psi","class.psi","phylum.psi",
-               "species.psi.zero","genus.psi.zero","family.psi.zero",
-               "order.psi.zero","class.psi.zero","phylum.psi.zero",
-               "omega","disp")
-    model.fit <- jags.model(file=textConnection(BHRM.microbiome),
-                            data=jdata,
-                            n.chains=n.chains,
-                            n.adapt=n.adapt,
-                            quiet=F)
-    update(model.fit, n.iter=n.iter.burnin, progress.bar="text")
-    model.fit <- coda.samples(model=model.fit,
-                              variable.names=var.s,
-                              n.iter=n.iter.sample,
-                              thin=1,
-                              progress.bar="text")
-
-  } else {
-    ## B. Model without Covariates----
-    BHRM.microbiome <-
-      "model {
-    for(r in 1:R) {
-      for(i in 1:N) {
         Y[i,r] ~ dnegbin(mu[i,r], disp[r])
         mu[i,r] <- disp[r]/(disp[r]+(1-zero[i,r])*lambda[i,r]) - 0.000001*zero[i,r]
-        log(lambda[i,r]) <- alpha[r] + inprod(species.beta[r,1:P], X.q[i,1:P]) + log(L[i,1])
 
-        # zero-inflation
+        # means component
+        log(lambda[i,r]) <- alpha[r] + inprod(beta[r,1:P.e], X.q[i,1:P.e]) + log(L[i,1])
+
+        # zero inflation component
         zero[i,r] ~ dbern(pi[i,r])
-        logit(pi[i,r]) <- alpha.zero[r] + inprod(species.beta.zero[r,1:P], X.q[i,1:P]) + log(L[i,1])
+        logit(pi[i,r]) <- alpha.zero[r] + inprod(beta.zero[r,1:P.e], X.q[i,1:P.e]) + log(L[i,1])
       }
       # prior on dispersion parameter
       disp[r] ~ dunif(0,50)
 
       # prior on intercept
-      alpha[r] ~ dnorm(0, 1.0E-02)
-      alpha.zero[r] ~ dnorm(0, 1.0E-02)
-
-      # prior on proportion of non-zeros
-      omega[r] ~ dunif(0,1)
-
-      # # prior on covariate effects
-      # for(q in 1:Q) {
-      #   delta[r,q] ~ dnorm(0, 1.0E-02)
-      #   delta.zero[r,q] ~ dnorm(0, 1.0E-02)
-      # }
+      alpha[r] ~ dnorm(0, 1.0E-02) # means component
+      alpha.zero[r] ~ dnorm(0, 1.0E-02) # zero inflation component
 
       # prior on exposure effects
-      for(p in 1:P) {
-        # species.beta.zero[r,p] ~ dnorm(0, 1.0E-02)
-        species.beta[r,p] ~ dnorm(mu.species[r,p], tau[r])
-        # mu.species[r,p] <- inprod(genus.beta[1:Genus.R,p], GenusData[r,1:Genus.R])
-        mu.species[r,p] <- 0
-        #Zero inflation component
-        species.beta.zero[r,p] ~ dnorm(mu.species.zero[r,p], tau[r])
-        # mu.species.zero[r,p] <- inprod(genus.beta.zero[1:Genus.R,p], GenusData[r,1:Genus.R])
-        mu.species.zero[r,p] <- 0
+      for(p in 1:P.e) {
+        beta[r,p] ~ dnorm(0, tau[r]) # means component
+        beta.zero[r,p] ~ dnorm(0, tau.zero[r]) # zero inflation component
       }
 
-      # prior on precision
+      # prior on precision for exposure effects
+      # means component
       tau[r] <- 1/(sigma[r]*sigma[r])
       sigma[r] ~ dunif(0,3)
 
-      # g-estimation
-      species.eta.low[r] <- inprod(species.beta[r,1:P], profiles[1,1:P])
-      species.eta.high[r] <- inprod(species.beta[r,1:P], profiles[2,1:P])
-      species.psi[r] <- species.eta.high[r]-species.eta.low[r]
-      # zero-inflation
-      species.eta.low.zero[r] <- inprod(species.beta.zero[r,1:P], profiles[1,1:P])
-      species.eta.high.zero[r] <- inprod(species.beta.zero[r,1:P], profiles[2,1:P])
-      species.psi.zero[r] <- species.eta.high.zero[r]-species.eta.low.zero[r]
-    }
-
-    # Genus level
-    for(g.r in 1:Genus.R) {
-      for(p in 1:P) {
-        genus.beta[g.r,p] ~ dnorm(mu.family[g.r,p],genus.tau[g.r]) # should this be shared effects across exposures at genus level? or shared effects across all genus by exposure?
-        # mu.family[g.r,p] <- inprod(family.beta[1:Family.R,p], FamilyData[g.r,1:Family.R])
-        mu.family[g.r,p] <- 0
-        #Zero inflation component
-        genus.beta.zero[g.r,p] ~ dnorm(mu.family.zero[g.r,p],genus.tau[g.r]) # should this be shared effects across exposures at genus level? or shared effects across all genus by exposure?
-        # mu.family.zero[g.r,p] <- inprod(family.beta.zero[1:Family.R,p], FamilyData[g.r,1:Family.R])
-        mu.family.zero[g.r,p] <- 0
-      }
-      # prior on precision
-      genus.tau[g.r] <- 1/(genus.sigma[g.r]*genus.sigma[g.r])
-      genus.sigma[g.r] ~ dunif(0,3)
+      # zero inflation component
+      tau.zero[r] <- 1/(sigma.zero[r]*sigma.zero[r])
+      sigma.zero[r] ~ dunif(0,3)
 
       # g-estimation
-      genus.eta.low[g.r] <- inprod(genus.beta[g.r,1:P], profiles[1,1:P])
-      genus.eta.high[g.r] <- inprod(genus.beta[g.r,1:P], profiles[2,1:P])
-      genus.psi[g.r] <- genus.eta.high[g.r]-genus.eta.low[g.r]
-      #zero inflation
-      genus.eta.low.zero[g.r] <- inprod(genus.beta.zero[g.r,1:P], profiles[1,1:P])
-      genus.eta.high.zero[g.r] <- inprod(genus.beta.zero[g.r,1:P], profiles[2,1:P])
-      genus.psi.zero[g.r] <- genus.eta.high.zero[g.r]-genus.eta.low.zero[g.r]
+      # means component
+      eta.low[r] <- inprod(beta[r,1:P.e], profiles[1,1:P.e])
+      eta.high[r] <- inprod(beta[r,1:P.e], profiles[2,1:P.e])
+      psi[r] <- eta.high[r]-eta.low[r]
+
+      # zero inflation component
+      eta.low.zero[r] <- inprod(beta.zero[r,1:P.e], profiles[1,1:P.e])
+      eta.high.zero[r] <- inprod(beta.zero[r,1:P.e], profiles[2,1:P.e])
+      psi.zero[r] <- eta.high.zero[r]-eta.low.zero[r]
     }
-
-    # Family level
-    for(f.r in 1:Family.R) {
-      for(p in 1:P) {
-        family.beta[f.r,p] ~ dnorm(mu.order[f.r,p], family.tau[f.r])
-        # mu.order[f.r,p] <- inprod(order.beta[1:Order.R,p], OrderData[f.r,1:Order.R])
-        mu.order[f.r,p] <- 0
-        #Zero inflation component
-        family.beta.zero[f.r,p] ~ dnorm(mu.order.zero[f.r,p], family.tau[f.r])
-        # mu.order.zero[f.r,p] <- inprod(order.beta.zero[1:Order.R,p], OrderData[f.r,1:Order.R])
-        mu.order.zero[f.r,p] <- 0
-
-      }
-      # prior on precision
-      family.tau[f.r] <- 1/(family.sigma[f.r]*family.sigma[f.r])
-      family.sigma[f.r] ~ dunif(0,3)
-
-      # g-estimation
-      family.eta.low[f.r] <- inprod(family.beta[f.r,1:P], profiles[1,1:P])
-      family.eta.high[f.r] <- inprod(family.beta[f.r,1:P], profiles[2,1:P])
-      family.psi[f.r] <- family.eta.high[f.r]-family.eta.low[f.r]
-      #zero inflation
-      family.eta.low.zero[f.r] <- inprod(family.beta.zero[f.r,1:P], profiles[1,1:P])
-      family.eta.high.zero[f.r] <- inprod(family.beta.zero[f.r,1:P], profiles[2,1:P])
-      family.psi.zero[f.r] <- family.eta.high.zero[f.r]-family.eta.low.zero[f.r]
-    }
-
-    # Order level
-    for(o.r in 1:Order.R) {
-      for(p in 1:P) {
-        order.beta[o.r,p] ~ dnorm(mu.class[o.r,p], order.tau[o.r])
-        # mu.class[o.r,p] <- inprod(class.beta[1:Class.R,p], ClassData[o.r,1:Class.R])
-        mu.class[o.r,p] <- 0
-        #Zero inflation component
-        order.beta.zero[o.r,p] ~ dnorm(mu.class.zero[o.r,p], order.tau[o.r])
-        # mu.class.zero[o.r,p] <- inprod(class.beta.zero[1:Class.R,p], ClassData[o.r,1:Class.R])
-        mu.class.zero[o.r,p] <- 0
-      }
-      # prior on precision
-      order.tau[o.r] <- 1/(order.sigma[o.r]*order.sigma[o.r])
-      order.sigma[o.r] ~ dunif(0,3)
-
-      # g-estimation
-      order.eta.low[o.r] <- inprod(order.beta[o.r,1:P], profiles[1,1:P])
-      order.eta.high[o.r] <- inprod(order.beta[o.r,1:P], profiles[2,1:P])
-      order.psi[o.r] <- order.eta.high[o.r]-order.eta.low[o.r]
-      #zero infl
-      order.eta.low.zero[o.r] <- inprod(order.beta.zero[o.r,1:P], profiles[1,1:P])
-      order.eta.high.zero[o.r] <- inprod(order.beta.zero[o.r,1:P], profiles[2,1:P])
-      order.psi.zero[o.r] <- order.eta.high.zero[o.r]-order.eta.low.zero[o.r]
-    }
-
-    # Class level
-    for(c.r in 1:Class.R) {
-      for(p in 1:P) {
-        class.beta[c.r,p] ~ dnorm(mu.phylum[c.r,p], class.tau[c.r])
-        # mu.phylum[c.r,p] <- inprod(phylum.beta[1:Phylum.R,p], PhylumData[c.r,1:Phylum.R])
-        mu.phylum[c.r,p] <- 0
-        #Zero inflation component
-        class.beta.zero[c.r,p] ~ dnorm(mu.phylum.zero[c.r,p], class.tau[c.r])
-        # mu.phylum.zero[c.r,p] <- inprod(phylum.beta.zero[1:Phylum.R,p], PhylumData[c.r,1:Phylum.R])
-        mu.phylum.zero[c.r,p] <- 0
-      }
-      # prior on precision
-      class.tau[c.r] <- 1/(class.sigma[c.r]*class.sigma[c.r])
-      class.sigma[c.r] ~ dunif(0,3)
-
-      # g-estimation
-      class.eta.low[c.r] <- inprod(class.beta[c.r,1:P], profiles[1,1:P])
-      class.eta.high[c.r] <- inprod(class.beta[c.r,1:P], profiles[2,1:P])
-      class.psi[c.r] <- class.eta.high[c.r]-class.eta.low[c.r]
-
-      #zero component
-      class.eta.low.zero[c.r] <- inprod(class.beta.zero[c.r,1:P], profiles[1,1:P])
-      class.eta.high.zero[c.r] <- inprod(class.beta.zero[c.r,1:P], profiles[2,1:P])
-      class.psi.zero[c.r] <- class.eta.high.zero[c.r]-class.eta.low.zero[c.r]
-    }
-
-    # Phylum level
-    for(p.r in 1:Phylum.R) {
-      for(p in 1:P) {
-        phylum.beta[p.r,p] ~ dnorm(0, phylum.tau[p.r])
-        #Zero inflation component
-        phylum.beta.zero[p.r,p] ~ dnorm(0, phylum.tau[p.r])
-      }
-      # prior on precision
-      phylum.tau[p.r] <- 1/(phylum.sigma[p.r]*phylum.sigma[p.r])
-      phylum.sigma[p.r] ~ dunif(0,3)
-
-      # g-estimation
-      phylum.eta.low[p.r] <- inprod(phylum.beta[p.r,1:P], profiles[1,1:P])
-      phylum.eta.high[p.r] <- inprod(phylum.beta[p.r,1:P], profiles[2,1:P])
-      phylum.psi[p.r] <- phylum.eta.high[p.r]-phylum.eta.low[p.r]
-
-      #Zero inflation
-      phylum.eta.low.zero[p.r] <- inprod(phylum.beta.zero[p.r,1:P], profiles[1,1:P])
-      phylum.eta.high.zero[p.r] <- inprod(phylum.beta.zero[p.r,1:P], profiles[2,1:P])
-      phylum.psi.zero[p.r] <- phylum.eta.high.zero[p.r]-phylum.eta.low.zero[p.r]
-    }
-
   }"
+  # 7. Define function to run models
+  run_bhrm_jags <- function(data, num, W = NULL, Q = NULL, jags_model_func, level = "Species") {
+    # Prepare data list
+    if (is.null(W)|is.null(Q)){
+      jdata <- list(N=N, Y=data, P.s=num, X.q=X.q, P.e=P,
+                    profiles=profiles, L=L)
+    }else{
+      jdata <- list(N=N, Y=data, P.s=num, X.q=X.q, P.e=P, W=W, Q=Q,
+                    profiles=profiles, L=L)
+    }
+    # Variables to monitor
+    var.s <- c("beta", "beta.zero","psi","disp")
 
-
-    # Run JAGs Estimation
-
-      jdata <- list(N=N, Y=Y, R=R, X.q=X.q, P=P,
-                    Genus.R=Genus.R,
-                    Family.R=Family.R,
-                    Order.R=Order.R,
-                    Class.R=Class.R,
-                    Phylum.R=Phylum.R,
-                    profiles=profiles,
-                    L=L)
-
-    var.s <- c("species.beta", "genus.beta", "family.beta", "order.beta",
-               "class.beta", "phylum.beta", "species.beta.zero",
-               "genus.beta.zero", "family.beta.zero", "order.beta.zero",
-               "class.beta.zero", "phylum.beta.zero","species.psi","genus.psi",
-               "family.psi","order.psi","class.psi","phylum.psi",
-               "species.psi.zero","genus.psi.zero","family.psi.zero",
-               "order.psi.zero","class.psi.zero","phylum.psi.zero",
-               "omega","disp")
-    model.fit <- jags.model(file=textConnection(BHRM.microbiome), data=jdata,
-                            n.chains=n.chains, n.adapt=n.adapt, quiet=F)
+    # Run JAGS model
+    model.fit <- jags.model(file=textConnection(jags_model_func),
+                            data=jdata, n.chains=n.chains, n.adapt=n.adapt, quiet=FALSE)
     update(model.fit, n.iter=n.iter.burnin, progress.bar="text")
     model.fit <- coda.samples(model=model.fit, variable.names=var.s,
                               n.iter=n.iter.sample, thin=1, progress.bar="text")
+
+    # Summarize results
+    r <- summary(model.fit)
+    results <- data.frame(
+      round(r$statistics[,1:2],3),
+      round(r$quantiles[,c(1,5)],3)
+    )
+
+    # Extract posterior draws
+    post_dist <- as.data.frame(model.fit[[1]])[, grep("beta|zero|psi", colnames(model.fit[[1]]))]
+
+    # Bayesian p-values
+    pdir <- apply(post_dist, 2, function(x) p_direction(x, threshold=0.05) %>% as.numeric())
+    prope <- apply(post_dist, 2, function(x) p_rope(x, rope=ROPE_range)$p_ROPE)
+    pmap <- apply(post_dist, 2, function(x) p_map(x) %>% as.numeric())
+
+    p_value_df <- data.frame(name = names(pdir), pdir = pdir, prope = prope, pmap = pmap)
+
+    # Format results
+    results <- results %>%
+      mutate(
+        component = case_when(
+          grepl("zero", rownames(.)) ~ "Zero-inflation model coefficients",
+          grepl("beta", rownames(.)) ~ "Count model coefficients",
+          grepl("psi", rownames(.))  ~ "Count model coefficients",
+          grepl("disp", rownames(.)) ~ "Dispersion",
+          TRUE ~ "Other"
+        )
+      ) %>%
+      rename(estimate = Mean,
+             bci_lcl = X2.5.,
+             bci_ucl = X97.5.) %>%
+      rownames_to_column("name") %>%
+      tidylog::left_join(p_value_df, by="name") %>%
+      mutate(name = ifelse(grepl("beta", name)|grepl("psi", name),
+                           paste0(level, ".", name),
+                           name)) %>%
+      column_to_rownames("name")
+
+    return(results)
   }
 
-  # 7. summarize results -------------------------------------------------------
-  ## Calculate Mean, SD, and quantiles ----
-  r <- summary(model.fit)
-  results <- data.frame(round(r$statistics[,1:2],3), round(r$quantiles[,c(1,5)],3))
+  # 8. Run Model ----
+  # Data list
+  data_list <- list(
+    Species = list(data = Y, num = R),
+    Genus = list(data = GenusData, num = Genus.R),
+    Family = list(data = FamilyData, num = Family.R),
+    Order = list(data = OrderData, num = Order.R),
+    Class = list(data = ClassData, num = Class.R),
+    Phylum = list(data = PhylumData, num = Phylum.R)
+  )
+  # Functions
+  jags_func <- if (!is.null(covar)) {
+    Ridge_BHRM.microbiome
+  } else {
+    Ridge_BHRM_no_covariates.microbiome
+  }
 
-  ## Calculate HPD intervals (not included in current version) ------
-  # x1 <- HPDinterval(model.fit[[1]], prob = 0.95)  %>% as.data.frame()
+  # Run models
+  results <- map2(data_list, names(data_list), ~ run_bhrm_jags(
+    data = .x$data,
+    num = .x$num,
+    W = if (!is.null(covar)) W else NULL,
+    Q = if (!is.null(covar)) Q else NULL,
+    jags_model_func = jags_func,
+    level = .y
+  ))%>% bind_rows()
 
-  ## Calculate p-values  ------
-  post_dist <-  as.data.frame(model.fit[[1]])[, grep("beta|zero|psi", colnames(model.fit[[1]]))]
-
-  ### p_direction ----
-  pdir <- apply(post_dist, 2, function(x){
-    p_direction(x = x, threshold = 0.05) %>%
-      as.numeric()})
-
-  ### p_rope ----
-  prope <- apply(post_dist, 2, function(x){
-    p_rope(x = x, rope = ROPE_range)$p_ROPE})
-
-  ### p_map ----
-  pmap <- apply(post_dist, 2, function(x){
-    p_map(x = x) %>%
-      as.numeric()})
-
-  # Get dataframe of p-values
-  p_value_df <- data.frame(name = names(pdir),
-                           pdir = pdir,
-                           prope = prope,
-                           pmap = pmap)
-
-  # # "Significant" example
-  # bayestestR::describe_posterior(post_dist$`family.beta[1,1]`)
-  # (pdirection <- bayestestR::p_direction(post_dist$`family.beta[1,1]`, as_p = TRUE)) %>% as.numeric()
-  # (prope <- bayestestR::p_rope(post_dist$`family.beta[1,1]`, rope = c(-0.1, 0.1), as_p = TRUE) %>% as.numeric())
-  # (pmap <- bayestestR::p_map(post_dist$`family.beta[1,1]`)) %>% as.numeric()
-  # (ps <- bayestestR::p_significance(post_dist$`family.beta[1,1]`, rope = c(-0.1, 0.1), as_p = TRUE))
-  #
-  # # "Non-significant" example
-  # bayestestR::describe_posterior(post_dist$`species.beta[189,2]`)
-  # bayestestR::p_direction(post_dist$`species.beta[189,2]`, as_p = TRUE)
-  # bayestestR::p_rope(post_dist$`species.beta[189,2]`, rope = c(-0.1, 0.1))
-
-  ## Create "component" variable ----
-  results <- results %>%
-    mutate(
-      component=case_when(
-        grepl("zero",rownames(.)) ~ "Zero-inflation model coefficients",
-        grepl("beta",rownames(.)) ~ "Count model coefficients",
-        grepl("psi",rownames(.))  ~ "Count model coefficients",
-        grepl("disp",rownames(.)) ~ "Dispersion",
-        grepl("omega",rownames(.)) ~ "Omega",
-        TRUE ~ "Other"))
-
-  # Calculate significance based on Bayesian Interval, rename variables (removed- jg 02_13_25 in place of p-values)
-  results <- results %>%
-    # mutate(bci_inc_zero = case_when(
-    #   grepl("disp",rownames(.)) ~ NA_character_,
-    #   grepl("omega",rownames(.)) ~ NA_character_,
-    #   (X2.5.<0 & X97.5.<0) | (X2.5.>0 & X97.5.>0) ~ "BCI ",
-    #   TRUE ~ "N.S.")) %>%
-    rename(estimate = Mean,
-           bci_lcl = X2.5.,
-           bci_ucl = X97.5.)
-
-  # Combine results df with p-value df
-  results$name = rownames(results)
-  results2 <- left_join(results, p_value_df, by = "name")
-  rownames(results2) <- results2$name
-  results2 <- results2 %>% select(-name)
-
-  # Calculate odds ratios-- removed --
-  # results2 <- results2 %>%
-  #   mutate(OR=exp(Mean),
-  #          OR.ll=exp(X2.5.),
-  #          OR.ul=exp(X97.5.))
-
-  #Format output names
+  # 9. Format output data----
   phylum   <- colnames(PhylumData)
   class    <- colnames(ClassData)
   order    <- colnames(OrderData)
@@ -792,59 +486,52 @@ Ridge_BaHZING_Model <- function(formatted_data,
   genus    <- colnames(GenusData)
   species  <- colnames(Y)
   exposure <- colnames(X)
-  results2$taxa_index <- str_remove(rownames(results2),"..*\\[")
-  results2$taxa_index <- str_remove(results2$taxa_index,",.*$")
-  results2$taxa_index <- str_remove(results2$taxa_index,"]")
-  results2$taxa_index <- as.numeric(results2$taxa_index)
-  results2$Exposure.Index <- str_remove(rownames(results2),"..*\\,")
-  results2 <- results2 %>%
+
+  results <- results %>%
+    mutate(taxa_index = str_remove(rownames(results),"..*\\[") %>%
+             str_remove(.,",.*$") %>%
+             str_remove(.,"].*$") %>% as.numeric(),
+           Exposure.Index = str_remove(rownames(results),"..*\\,"))%>%
     mutate(Exposure.Index=ifelse(
       grepl("disp",Exposure.Index)|
-        grepl("omega",Exposure.Index)|
         grepl("psi",Exposure.Index),
-      NA,Exposure.Index))
-  results2$Exposure.Index <- str_remove(results2$Exposure.Index,"]")
-  results2$Exposure.Index <- as.numeric(results2$Exposure.Index)
-
-
-  results2 <- results2 %>%
-    mutate(taxa_full=case_when(
-      grepl("phylum",rownames(results2)) ~ paste0(phylum[taxa_index]),
-      grepl("class"  ,rownames(results2)) ~ paste0(class[taxa_index]),
-      grepl("order"  ,rownames(results2)) ~ paste0(order[taxa_index]),
-      grepl("family" ,rownames(results2)) ~ paste0(family[taxa_index]),
-      grepl("genus"  ,rownames(results2)) ~ paste0(genus[taxa_index]),
-      grepl("species",rownames(results2)) ~ paste0(species[taxa_index])),
+      NA,Exposure.Index)) %>%
+    mutate(Exposure.Index = suppressWarnings(str_remove(Exposure.Index,"]") %>%
+                                               as.numeric())) %>%
+    mutate(
+      taxa_full=case_when(
+        grepl("Phylum", rownames(results)) ~ paste0(phylum[taxa_index]),
+        grepl("Class"  ,rownames(results)) ~ paste0(class[taxa_index]),
+        grepl("Order"  ,rownames(results)) ~ paste0(order[taxa_index]),
+        grepl("Family" ,rownames(results)) ~ paste0(family[taxa_index]),
+        grepl("Genus"  ,rownames(results)) ~ paste0(genus[taxa_index]),
+        grepl("Species",rownames(results)) ~ paste0(species[taxa_index])),
       domain=case_when(
-        grepl("phylum" ,rownames(results2))  ~ "Phylum",
-        grepl("class"  ,rownames(results2))   ~ "Class",
-        grepl("order"  ,rownames(results2))   ~ "Order",
-        grepl("family" ,rownames(results2))  ~ "Family",
-        grepl("genus"  ,rownames(results2))   ~ "Genus",
-        grepl("species",rownames(results2)) ~ "Species"),
-      exposure=paste0(exposure[Exposure.Index]))
-
-  # Modify Exposure variable
-  results2 <- results2 %>%
+        grepl("Phylum" ,rownames(results))  ~ "Phylum",
+        grepl("Class"  ,rownames(results))   ~ "Class",
+        grepl("Order"  ,rownames(results))   ~ "Order",
+        grepl("Family" ,rownames(results))  ~ "Family",
+        grepl("Genus"  ,rownames(results))   ~ "Genus",
+        grepl("Species",rownames(results)) ~ "Species"),
+      exposure=paste0(exposure[Exposure.Index])) %>%
+    # Modify Exposure variable
     mutate(exposure=case_when(
       grepl("psi",rownames(.)) ~ "Mixture",
       grepl("disp",rownames(.)) ~ "Dispersion",
-      grepl("omega",rownames(.)) ~ "Omega",
+
       TRUE ~ exposure))
 
-  # Get Taxa and domain information for
-  results2 <- results2 %>%
-    mutate(taxa_full=ifelse(grepl("disp", rownames(results2)),paste0(species[taxa_index]),taxa_full),
-           taxa_full=ifelse(grepl("omega",rownames(results2)),paste0(species[taxa_index]),taxa_full),
+  # Get Taxa and domain information
+  results2 <- results %>%
+    mutate(taxa_full= ifelse(grepl("disp", rownames(results)),paste0(species[taxa_index]),taxa_full),
            taxa_name = sub(".*__", "", taxa_full),
-           domain = ifelse(exposure == "Dispersion" | exposure == "Omega",
+           domain = ifelse(exposure == "Dispersion",
                            "Species", domain))
 
   # Remove "disp" and "omega" estimates
   if(!return_all_estimates){
     results2 <- results2 %>%
-      filter(!grepl("disp",rownames(results2)),
-             !grepl("omega",rownames(results2)))
+      filter(!grepl("disp",rownames(results2)))
   }
 
   # Remove rownames
@@ -856,5 +543,5 @@ Ridge_BaHZING_Model <- function(formatted_data,
            estimate,bci_lcl,bci_ucl,pdir,prope,pmap)
 
   return(results2)
-}
+  }
 

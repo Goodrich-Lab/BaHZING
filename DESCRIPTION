@@ -1,45 +1,12 @@
 Package: BaHZING
-Title: Bayesian Hierarchical Zero-Inflated Negative Binomial Regression
-    with G-Computation
-Version: 1.0.0
-Authors@R: c(
-    person("Hailey", "Hampson", , "hhampson@usc.edu", role = "aut"),
-    person("Jesse", "Goodrich", , "jagoodri@usc.edu", role = c("aut", "cre"),
-           comment = c(ORCID = "0000-0001-6615-0472")),
-    person("Hongxu", "Wang", , "hongxuwa@usc.edu", role = "aut"),
-    person("Tanya", "Alderete", , "taldere1@jhu.edu", role = "ctb"),
-    person("Shardul", "Nazirkar", , "nazirkar@usc.edu", role = "ctb"),
-    person("David", "Conti", , "dconti@usc.edu", role = "aut")
-  )
-Description: A Bayesian model for examining the association between
-    environmental mixtures and all Taxa measured in a hierarchical
-    microbiome dataset in a single integrated analysis. Compared with
-    analyzing the associations of environmental mixtures with each Taxa
-    individually, 'BaHZING' controls Type 1 error rates and provides more
-    stable effect estimates when dealing with small sample sizes.
-License: GPL (>= 3)
-Depends: 
-    R (>= 4.1.0),
-    rjags (>= 4.0.0)
-Imports:
-    bayestestR,
-    dplyr,
-    magrittr,
-    phyloseq,
-    pscl,
-    purrr,
-    qgcomp,
-    R2jags,
-    stats,
-    stringr,
-    tidyr,
-    utils
-Suggests:
-    testthat (>= 3.0.0)
-Config/testthat/edition: 3
-Config/testthat/parallel: true
+Title: What the Package Does (One Line, Title Case)
+Version: 0.0.0.9000
+Authors@R: 
+    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"),
+           comment = c(ORCID = "YOUR-ORCID-ID"))
+Description: What the package does (one paragraph).
+License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
+    license
 Encoding: UTF-8
-LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
-SystemRequirements: JAGS 4.x.y (http://mcmc-jags.sourceforge.net)
