@@ -296,8 +296,8 @@ Ridge_BaHZING_Model <- function(formatted_data,
 
         # zero inflation component
         zero[i,r] ~ dbern(pi[i,r])
-        logit(pi[i,r]) <- alpha.zero[r] + inprod(beta.zero[r,1:P.e], X.q[i,1:P.e]) + inprod(delta.zero[r, 1:Q], W[i,1:Q]) + log(L[i,1])
-      }
+      pi[i,r] <-  0.05 # Edited 5/20/2026 by Jesse to 0.05, as a test to see whether that helps with the negative bias in the results
+      # logit(pi[i,r]) <- alpha.zero[r] + inprod(beta.zero[r,1:P.e], X.q[i,1:P.e]) + inprod(delta.zero[r, 1:Q], W[i,1:Q]) + log(L[i,1]) # Removed 5/20/2026      }
       # prior on dispersion parameter
       disp[r] ~ dunif(0,50)
 
@@ -354,8 +354,8 @@ Ridge_BaHZING_Model <- function(formatted_data,
 
         # zero inflation component
         zero[i,r] ~ dbern(pi[i,r])
-        logit(pi[i,r]) <- alpha.zero[r] + inprod(beta.zero[r,1:P.e], X.q[i,1:P.e]) + log(L[i,1])
-      }
+      pi[i,r] <-  0.05 # Edited 5/20/2026 by Jesse to 0.05, as a test to see whether that helps with the negative bias in the results
+      # logit(pi[i,r]) <- alpha.zero[r] + inprod(beta.zero[r,1:P.e], X.q[i,1:P.e]) + log(L[i,1]) # Removed 5/20/2026      }
       # prior on dispersion parameter
       disp[r] ~ dunif(0,50)
 
