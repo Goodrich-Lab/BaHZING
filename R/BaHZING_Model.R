@@ -283,7 +283,7 @@ BaHZING_Model <- function(formatted_data,
       for(i in 1:N) {
         Y[i,r] ~ dnegbin(mu[i,r], disp[r])
         mu[i,r] <- disp[r]/(disp[r]+(1-zero[i,r])*lambda[i,r]) - 0.000001*zero[i,r]
-        log(lambda[i,r]) <- alpha[r] + inprod(species.beta[r,1:P], X.q[i,1:P]) + inprod(delta[r, 1:Q], W[i,1:Q]) + log(L[i,1])
+        log(lambda[i,r]) <- alpha[r] + inprod(species.beta[r,1:P], X.q[i,1:P]) + inprod(delta[r, 1:Q], W[i,1:Q]) # remove offset
 
         # zero-inflation
         zero[i,r] ~ dbern(pi[i,r])
@@ -494,7 +494,7 @@ BaHZING_Model <- function(formatted_data,
       for(i in 1:N) {
         Y[i,r] ~ dnegbin(mu[i,r], disp[r])
         mu[i,r] <- disp[r]/(disp[r]+(1-zero[i,r])*lambda[i,r]) - 0.000001*zero[i,r]
-        log(lambda[i,r]) <- alpha[r] + inprod(species.beta[r,1:P], X.q[i,1:P]) + log(L[i,1])
+        log(lambda[i,r]) <- alpha[r] + inprod(species.beta[r,1:P], X.q[i,1:P]) # remove offset
 
         # zero-inflation
         zero[i,r] ~ dbern(pi[i,r])
