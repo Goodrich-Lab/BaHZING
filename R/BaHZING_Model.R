@@ -286,6 +286,7 @@ BaHZING_Model <- function(formatted_data,
         log(lambda[i,r]) <- alpha[r] + inprod(species.beta[r,1:P], X.q[i,1:P]) + inprod(delta[r, 1:Q], W[i,1:Q]) + log(L[i,1])
 
         # zero-inflation
+        zero[i,r] ~ dbern(pi[i,r])
         pi[i,r] <-  0.05 # Edited 5/20/2026 by Jesse to 0.05, as a test to see whether that helps with the negative bias in the results
         # logit(pi[i,r]) <- alpha.zero[r] + inprod(species.beta.zero[r,1:P], X.q[i,1:P]) + inprod(delta.zero[r, 1:Q], W[i,1:Q]) + log(L[i,1]) # Removed 5/20/2026
       }
