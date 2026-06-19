@@ -287,8 +287,7 @@ BaHZING_Model <- function(formatted_data,
 
         # zero-inflation
         zero[i,r] ~ dbern(pi[i,r])
-        pi[i,r] <-  0.05 # Edited 5/20/2026 by Jesse to 0.05, as a test to see whether that helps with the negative bias in the results
-        # logit(pi[i,r]) <- alpha.zero[r] + inprod(species.beta.zero[r,1:P], X.q[i,1:P]) + inprod(delta.zero[r, 1:Q], W[i,1:Q]) + log(L[i,1]) # Removed 5/20/2026
+        logit(pi[i,r]) <- alpha.zero[r] + inprod(species.beta.zero[r,1:P], X.q[i,1:P]) + inprod(delta.zero[r, 1:Q], W[i,1:Q]) + log(L[i,1])
       }
       # prior on dispersion parameter
       disp[r] ~ dunif(0,50)
@@ -308,15 +307,15 @@ BaHZING_Model <- function(formatted_data,
         species.beta[r,p] ~ dnorm(mu.species[r,p], tau[r])
         mu.species[r,p] <- inprod(genus.beta[1:Genus.R,p], GenusData[r,1:Genus.R])
         #Zero inflation component
-        species.beta.zero[r,p] ~ dnorm(mu.species.zero[r,p], tau.zero[r])
+        species.beta.zero[r,p] ~ dnorm(mu.species.zero[r,p], tau[r])
         mu.species.zero[r,p] <- inprod(genus.beta.zero[1:Genus.R,p], GenusData[r,1:Genus.R])
       }
 
       # prior on precision
       tau[r] <- 1/(sigma[r]*sigma[r])
       sigma[r] ~ dunif(0,3)
-      tau.zero[r] <- 1/(sigma.zero[r]*sigma.zero[r])
-      sigma.zero[r] ~ dunif(0,3)
+      # tau.zero[r] <- 1/(sigma.zero[r]*sigma.zero[r])
+      # sigma.zero[r] ~ dunif(0,3)
 
       # g-estimation
       species.eta.low[r] <- inprod(species.beta[r,1:P], profiles[1,1:P])
@@ -334,14 +333,14 @@ BaHZING_Model <- function(formatted_data,
         genus.beta[g.r,p] ~ dnorm(mu.family[g.r,p],genus.tau[g.r]) # should this be shared effects across exposures at genus level? or shared effects across all genus by exposure?
         mu.family[g.r,p] <- inprod(family.beta[1:Family.R,p], FamilyData[g.r,1:Family.R])
         #Zero inflation component
-        genus.beta.zero[g.r,p] ~ dnorm(mu.family.zero[g.r,p],genus.tau.zero[g.r]) # should this be shared effects across exposures at genus level? or shared effects across all genus by exposure?
+        genus.beta.zero[g.r,p] ~ dnorm(mu.family.zero[g.r,p],genus.tau[g.r]) # should this be shared effects across exposures at genus level? or shared effects across all genus by exposure?
         mu.family.zero[g.r,p] <- inprod(family.beta.zero[1:Family.R,p], FamilyData[g.r,1:Family.R])
       }
       # prior on precision
       genus.tau[g.r] <- 1/(genus.sigma[g.r]*genus.sigma[g.r])
       genus.sigma[g.r] ~ dunif(0,3)
-      genus.tau.zero[g.r] <- 1/(genus.sigma.zero[g.r]*genus.sigma.zero[g.r])
-      genus.sigma.zero[g.r] ~ dunif(0,3)
+      # genus.tau.zero[g.r] <- 1/(genus.sigma.zero[g.r]*genus.sigma.zero[g.r])
+      # genus.sigma.zero[g.r] ~ dunif(0,3)
 
       # g-estimation
       genus.eta.low[g.r] <- inprod(genus.beta[g.r,1:P], profiles[1,1:P])
@@ -359,15 +358,15 @@ BaHZING_Model <- function(formatted_data,
         family.beta[f.r,p] ~ dnorm(mu.order[f.r,p], family.tau[f.r])
         mu.order[f.r,p] <- inprod(order.beta[1:Order.R,p], OrderData[f.r,1:Order.R])
         #Zero inflation component
-        family.beta.zero[f.r,p] ~ dnorm(mu.order.zero[f.r,p], family.tau.zero[f.r])
+        family.beta.zero[f.r,p] ~ dnorm(mu.order.zero[f.r,p], family.tau[f.r])
         mu.order.zero[f.r,p] <- inprod(order.beta.zero[1:Order.R,p], OrderData[f.r,1:Order.R])
 
       }
       # prior on precision
       family.tau[f.r] <- 1/(family.sigma[f.r]*family.sigma[f.r])
       family.sigma[f.r] ~ dunif(0,3)
-      family.tau.zero[f.r] <- 1/(family.sigma.zero[f.r]*family.sigma.zero[f.r])
-      family.sigma.zero[f.r] ~ dunif(0,3)
+      # family.tau.zero[f.r] <- 1/(family.sigma.zero[f.r]*family.sigma.zero[f.r])
+      # family.sigma.zero[f.r] ~ dunif(0,3)
 
       # g-estimation
       family.eta.low[f.r] <- inprod(family.beta[f.r,1:P], profiles[1,1:P])
@@ -385,14 +384,14 @@ BaHZING_Model <- function(formatted_data,
         order.beta[o.r,p] ~ dnorm(mu.class[o.r,p], order.tau[o.r])
         mu.class[o.r,p] <- inprod(class.beta[1:Class.R,p], ClassData[o.r,1:Class.R])
         #Zero inflation component
-        order.beta.zero[o.r,p] ~ dnorm(mu.class.zero[o.r,p], order.tau.zero[o.r])
+        order.beta.zero[o.r,p] ~ dnorm(mu.class.zero[o.r,p], order.tau[o.r])
         mu.class.zero[o.r,p] <- inprod(class.beta.zero[1:Class.R,p], ClassData[o.r,1:Class.R])
       }
       # prior on precision
       order.tau[o.r] <- 1/(order.sigma[o.r]*order.sigma[o.r])
       order.sigma[o.r] ~ dunif(0,3)
-      order.tau.zero[o.r] <- 1/(order.sigma.zero[o.r]*order.sigma.zero[o.r])
-      order.sigma.zero[o.r] ~ dunif(0,3)
+      # order.tau.zero[o.r] <- 1/(order.sigma.zero[o.r]*order.sigma.zero[o.r])
+      # order.sigma.zero[o.r] ~ dunif(0,3)
 
       # g-estimation
       order.eta.low[o.r] <- inprod(order.beta[o.r,1:P], profiles[1,1:P])
@@ -410,14 +409,14 @@ BaHZING_Model <- function(formatted_data,
         class.beta[c.r,p] ~ dnorm(mu.phylum[c.r,p], class.tau[c.r])
         mu.phylum[c.r,p] <- inprod(phylum.beta[1:Phylum.R,p], PhylumData[c.r,1:Phylum.R])
         #Zero inflation component
-        class.beta.zero[c.r,p] ~ dnorm(mu.phylum.zero[c.r,p], class.tau.zero[c.r])
+        class.beta.zero[c.r,p] ~ dnorm(mu.phylum.zero[c.r,p], class.tau[c.r])
         mu.phylum.zero[c.r,p] <- inprod(phylum.beta.zero[1:Phylum.R,p], PhylumData[c.r,1:Phylum.R])
       }
       # prior on precision
       class.tau[c.r] <- 1/(class.sigma[c.r]*class.sigma[c.r])
       class.sigma[c.r] ~ dunif(0,3)
-      class.tau.zero[c.r] <- 1/(class.sigma.zero[c.r]*class.sigma.zero[c.r])
-      class.sigma.zero[c.r] ~ dunif(0,3)
+      # class.tau.zero[c.r] <- 1/(class.sigma.zero[c.r]*class.sigma.zero[c.r])
+      # class.sigma.zero[c.r] ~ dunif(0,3)
 
       # g-estimation
       class.eta.low[c.r] <- inprod(class.beta[c.r,1:P], profiles[1,1:P])
@@ -435,13 +434,13 @@ BaHZING_Model <- function(formatted_data,
       for(p in 1:P) {
         phylum.beta[p.r,p] ~ dnorm(0, phylum.tau[p.r])
         #Zero inflation component
-        phylum.beta.zero[p.r,p] ~ dnorm(0, phylum.tau.zero[p.r])
+        phylum.beta.zero[p.r,p] ~ dnorm(0, phylum.tau[p.r])
       }
       # prior on precision
       phylum.tau[p.r] <- 1/(phylum.sigma[p.r]*phylum.sigma[p.r])
       phylum.sigma[p.r] ~ dunif(0,3)
-      phylum.tau.zero[p.r] <- 1/(phylum.sigma.zero[p.r]*phylum.sigma.zero[p.r])
-      phylum.sigma.zero[p.r] ~ dunif(0,3)
+      # phylum.tau.zero[p.r] <- 1/(phylum.sigma.zero[p.r]*phylum.sigma.zero[p.r])
+      # phylum.sigma.zero[p.r] ~ dunif(0,3)
 
       # g-estimation
       phylum.eta.low[p.r] <- inprod(phylum.beta[p.r,1:P], profiles[1,1:P])
@@ -498,8 +497,7 @@ BaHZING_Model <- function(formatted_data,
 
         # zero-inflation
         zero[i,r] ~ dbern(pi[i,r])
-        pi[i,r] <-  0.05 # Edited 5/20/2026 by Jesse to 0.05, as a test to see whether that helps with the negative bias in the results
-        # logit(pi[i,r]) <- alpha.zero[r] + inprod(species.beta.zero[r,1:P], X.q[i,1:P]) + log(L[i,1]) # Removed 5/20/2026
+        logit(pi[i,r]) <- alpha.zero[r] + inprod(species.beta.zero[r,1:P], X.q[i,1:P]) + log(L[i,1])
       }
       # prior on dispersion parameter
       disp[r] ~ dunif(0,50)
@@ -519,15 +517,15 @@ BaHZING_Model <- function(formatted_data,
         species.beta[r,p] ~ dnorm(mu.species[r,p], tau[r])
         mu.species[r,p] <- inprod(genus.beta[1:Genus.R,p], GenusData[r,1:Genus.R])
         #Zero inflation component
-        species.beta.zero[r,p] ~ dnorm(mu.species.zero[r,p], tau.zero[r])
+        species.beta.zero[r,p] ~ dnorm(mu.species.zero[r,p], tau[r])
         mu.species.zero[r,p] <- inprod(genus.beta.zero[1:Genus.R,p], GenusData[r,1:Genus.R])
       }
 
       # prior on precision
       tau[r] <- 1/(sigma[r]*sigma[r])
       sigma[r] ~ dunif(0,3)
-      tau.zero[r] <- 1/(sigma.zero[r]*sigma.zero[r])
-      sigma.zero[r] ~ dunif(0,3)
+      # tau.zero[r] <- 1/(sigma.zero[r]*sigma.zero[r])
+      # sigma.zero[r] ~ dunif(0,3)
 
       # g-estimation
       species.eta.low[r] <- inprod(species.beta[r,1:P], profiles[1,1:P])
@@ -545,14 +543,14 @@ BaHZING_Model <- function(formatted_data,
         genus.beta[g.r,p] ~ dnorm(mu.family[g.r,p],genus.tau[g.r]) # should this be shared effects across exposures at genus level? or shared effects across all genus by exposure?
         mu.family[g.r,p] <- inprod(family.beta[1:Family.R,p], FamilyData[g.r,1:Family.R])
         #Zero inflation component
-        genus.beta.zero[g.r,p] ~ dnorm(mu.family.zero[g.r,p],genus.tau.zero[g.r]) # should this be shared effects across exposures at genus level? or shared effects across all genus by exposure?
+        genus.beta.zero[g.r,p] ~ dnorm(mu.family.zero[g.r,p],genus.tau[g.r]) # should this be shared effects across exposures at genus level? or shared effects across all genus by exposure?
         mu.family.zero[g.r,p] <- inprod(family.beta.zero[1:Family.R,p], FamilyData[g.r,1:Family.R])
       }
       # prior on precision
       genus.tau[g.r] <- 1/(genus.sigma[g.r]*genus.sigma[g.r])
       genus.sigma[g.r] ~ dunif(0,3)
-      genus.tau.zero[g.r] <- 1/(genus.sigma.zero[g.r]*genus.sigma.zero[g.r])
-      genus.sigma.zero[g.r] ~ dunif(0,3)
+      # genus.tau.zero[g.r] <- 1/(genus.sigma.zero[g.r]*genus.sigma.zero[g.r])
+      # genus.sigma.zero[g.r] ~ dunif(0,3)
 
       # g-estimation
       genus.eta.low[g.r] <- inprod(genus.beta[g.r,1:P], profiles[1,1:P])
@@ -570,15 +568,15 @@ BaHZING_Model <- function(formatted_data,
         family.beta[f.r,p] ~ dnorm(mu.order[f.r,p], family.tau[f.r])
         mu.order[f.r,p] <- inprod(order.beta[1:Order.R,p], OrderData[f.r,1:Order.R])
         #Zero inflation component
-        family.beta.zero[f.r,p] ~ dnorm(mu.order.zero[f.r,p], family.tau.zero[f.r])
+        family.beta.zero[f.r,p] ~ dnorm(mu.order.zero[f.r,p], family.tau[f.r])
         mu.order.zero[f.r,p] <- inprod(order.beta.zero[1:Order.R,p], OrderData[f.r,1:Order.R])
 
       }
       # prior on precision
       family.tau[f.r] <- 1/(family.sigma[f.r]*family.sigma[f.r])
       family.sigma[f.r] ~ dunif(0,3)
-      family.tau.zero[f.r] <- 1/(family.sigma.zero[f.r]*family.sigma.zero[f.r])
-      family.sigma.zero[f.r] ~ dunif(0,3)
+      # family.tau.zero[f.r] <- 1/(family.sigma.zero[f.r]*family.sigma.zero[f.r])
+      # family.sigma.zero[f.r] ~ dunif(0,3)
 
       # g-estimation
       family.eta.low[f.r] <- inprod(family.beta[f.r,1:P], profiles[1,1:P])
@@ -596,14 +594,14 @@ BaHZING_Model <- function(formatted_data,
         order.beta[o.r,p] ~ dnorm(mu.class[o.r,p], order.tau[o.r])
         mu.class[o.r,p] <- inprod(class.beta[1:Class.R,p], ClassData[o.r,1:Class.R])
         #Zero inflation component
-        order.beta.zero[o.r,p] ~ dnorm(mu.class.zero[o.r,p], order.tau.zero[o.r])
+        order.beta.zero[o.r,p] ~ dnorm(mu.class.zero[o.r,p], order.tau[o.r])
         mu.class.zero[o.r,p] <- inprod(class.beta.zero[1:Class.R,p], ClassData[o.r,1:Class.R])
       }
       # prior on precision
       order.tau[o.r] <- 1/(order.sigma[o.r]*order.sigma[o.r])
       order.sigma[o.r] ~ dunif(0,3)
-      order.tau.zero[o.r] <- 1/(order.sigma.zero[o.r]*order.sigma.zero[o.r])
-      order.sigma.zero[o.r] ~ dunif(0,3)
+      # order.tau.zero[o.r] <- 1/(order.sigma.zero[o.r]*order.sigma.zero[o.r])
+      # order.sigma.zero[o.r] ~ dunif(0,3)
 
       # g-estimation
       order.eta.low[o.r] <- inprod(order.beta[o.r,1:P], profiles[1,1:P])
@@ -621,14 +619,14 @@ BaHZING_Model <- function(formatted_data,
         class.beta[c.r,p] ~ dnorm(mu.phylum[c.r,p], class.tau[c.r])
         mu.phylum[c.r,p] <- inprod(phylum.beta[1:Phylum.R,p], PhylumData[c.r,1:Phylum.R])
         #Zero inflation component
-        class.beta.zero[c.r,p] ~ dnorm(mu.phylum.zero[c.r,p], class.tau.zero[c.r])
+        class.beta.zero[c.r,p] ~ dnorm(mu.phylum.zero[c.r,p], class.tau[c.r])
         mu.phylum.zero[c.r,p] <- inprod(phylum.beta.zero[1:Phylum.R,p], PhylumData[c.r,1:Phylum.R])
       }
       # prior on precision
       class.tau[c.r] <- 1/(class.sigma[c.r]*class.sigma[c.r])
       class.sigma[c.r] ~ dunif(0,3)
-      class.tau.zero[c.r] <- 1/(class.sigma.zero[c.r]*class.sigma.zero[c.r])
-      class.sigma.zero[c.r] ~ dunif(0,3)
+      # class.tau.zero[c.r] <- 1/(class.sigma.zero[c.r]*class.sigma.zero[c.r])
+      # class.sigma.zero[c.r] ~ dunif(0,3)
 
       # g-estimation
       class.eta.low[c.r] <- inprod(class.beta[c.r,1:P], profiles[1,1:P])
@@ -646,13 +644,13 @@ BaHZING_Model <- function(formatted_data,
       for(p in 1:P) {
         phylum.beta[p.r,p] ~ dnorm(0, phylum.tau[p.r])
         #Zero inflation component
-        phylum.beta.zero[p.r,p] ~ dnorm(0, phylum.tau.zero[p.r])
+        phylum.beta.zero[p.r,p] ~ dnorm(0, phylum.tau[p.r])
       }
       # prior on precision
       phylum.tau[p.r] <- 1/(phylum.sigma[p.r]*phylum.sigma[p.r])
       phylum.sigma[p.r] ~ dunif(0,3)
-      phylum.tau.zero[p.r] <- 1/(phylum.sigma.zero[p.r]*phylum.sigma.zero[p.r])
-      phylum.sigma.zero[p.r] ~ dunif(0,3)
+      # phylum.tau.zero[p.r] <- 1/(phylum.sigma.zero[p.r]*phylum.sigma.zero[p.r])
+      # phylum.sigma.zero[p.r] ~ dunif(0,3)
 
       # g-estimation
       phylum.eta.low[p.r] <- inprod(phylum.beta[p.r,1:P], profiles[1,1:P])
