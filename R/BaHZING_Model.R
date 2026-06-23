@@ -282,42 +282,74 @@ BaHZING_Model <- function(formatted_data,
     for(r in 1:R) {
       for(i in 1:N) {
         Y[i,r] ~ dnegbin(mu[i,r], disp[r])
-        mu[i,r] <- disp[r]/(disp[r]+lambda[i,r])
-        log(lambda[i,r]) <- alpha[r] + inprod(species.beta[r,1:P], X.q[i,1:P]) + inprod(delta[r, 1:Q], W[i,1:Q])
+        mu[i,r] <- disp[r]/(disp[r]+(1-zero[i,r])*lambda[i,r]) - 0.000001*zero[i,r]
+        log(lambda[i,r]) <- alpha[r] + inprod(species.beta[r,1:P], X.q[i,1:P]) + inprod(delta[r, 1:Q], W[i,1:Q]) + log(L[i,1])
+
+        # zero-inflation
+        zero[i,r] ~ dbern(pi[i,r])
+        logit(pi[i,r]) <- alpha.zero[r] + inprod(species.beta.zero[r,1:P], X.q[i,1:P]) + inprod(delta.zero[r, 1:Q], W[i,1:Q]) + log(L[i,1])
       }
       # prior on dispersion parameter
       disp[r] ~ dunif(0,50)
 
       # prior on intercept
-      alpha[r] ~ dnorm(0, 1.0E-01)
+      alpha[r] ~ dnorm(0, 1.0E-02)
+      alpha.zero[r] ~ dnorm(0, 1.0E-02)
 
       # prior on covariate effects
-      for(q in 1:Q) { delta[r,q] ~ dnorm(0, 1.0E-02) }
+      for(q in 1:Q) {
+        delta[r,q] ~ dnorm(0, 1.0E-02)
+        delta.zero[r,q] ~ dnorm(0, 1.0E-02)
+      }
 
       # prior on exposure effects
       for(p in 1:P) {
         species.beta[r,p] ~ dnorm(mu.species[r,p], tau[r])
         mu.species[r,p] <- inprod(genus.beta[1:Genus.R,p], GenusData[r,1:Genus.R])
+        #Zero inflation component
+        species.beta.zero[r,p] ~ dnorm(mu.species.zero[r,p], tau.zero[r])
+        mu.species.zero[r,p] <- inprod(genus.beta.zero[1:Genus.R,p], GenusData[r,1:Genus.R])
       }
 
       # prior on precision
       tau[r] <- 1/(sigma[r]*sigma[r])
       sigma[r] ~ dunif(0,3)
+      tau.zero[r] <- 1/(sigma.zero[r]*sigma.zero[r])
+      sigma.zero[r] ~ dunif(0,3)
 
       # g-estimation
-      eta.low[r] <- inprod(species.beta[r,1:P], profiles[1,1:P])
-      eta.high[r] <- inprod(species.beta[r,1:P], profiles[2,1:P])
-      psi[r] <- eta.high[r]-eta.low[r]
+      species.eta.low[r] <- inprod(species.beta[r,1:P], profiles[1,1:P])
+      species.eta.high[r] <- inprod(species.beta[r,1:P], profiles[2,1:P])
+      species.psi[r] <- species.eta.high[r]-species.eta.low[r]
+      # zero-inflation
+      species.eta.low.zero[r] <- inprod(species.beta.zero[r,1:P], profiles[1,1:P])
+      species.eta.high.zero[r] <- inprod(species.beta.zero[r,1:P], profiles[2,1:P])
+      species.psi.zero[r] <- species.eta.high.zero[r]-species.eta.low.zero[r]
     }
 
     # Genus level
     for(g.r in 1:Genus.R) {
       for(p in 1:P) {
-        genus.beta[g.r,p] ~ dnorm(mu.family[g.r,p], genus.tau[g.r])
+        genus.beta[g.r,p] ~ dnorm(mu.family[g.r,p],genus.tau[g.r]) # should this be shared effects across exposures at genus level? or shared effects across all genus by exposure?
         mu.family[g.r,p] <- inprod(family.beta[1:Family.R,p], FamilyData[g.r,1:Family.R])
+        #Zero inflation component
+        genus.beta.zero[g.r,p] ~ dnorm(mu.family.zero[g.r,p],genus.tau.zero[g.r]) # should this be shared effects across exposures at genus level? or shared effects across all genus by exposure?
+        mu.family.zero[g.r,p] <- inprod(family.beta.zero[1:Family.R,p], FamilyData[g.r,1:Family.R])
       }
+      # prior on precision
       genus.tau[g.r] <- 1/(genus.sigma[g.r]*genus.sigma[g.r])
       genus.sigma[g.r] ~ dunif(0,3)
+      genus.tau.zero[g.r] <- 1/(genus.sigma.zero[g.r]*genus.sigma.zero[g.r])
+      genus.sigma.zero[g.r] ~ dunif(0,3)
+
+      # g-estimation
+      genus.eta.low[g.r] <- inprod(genus.beta[g.r,1:P], profiles[1,1:P])
+      genus.eta.high[g.r] <- inprod(genus.beta[g.r,1:P], profiles[2,1:P])
+      genus.psi[g.r] <- genus.eta.high[g.r]-genus.eta.low[g.r]
+      #zero inflation
+      genus.eta.low.zero[g.r] <- inprod(genus.beta.zero[g.r,1:P], profiles[1,1:P])
+      genus.eta.high.zero[g.r] <- inprod(genus.beta.zero[g.r,1:P], profiles[2,1:P])
+      genus.psi.zero[g.r] <- genus.eta.high.zero[g.r]-genus.eta.low.zero[g.r]
     }
 
     # Family level
@@ -325,9 +357,25 @@ BaHZING_Model <- function(formatted_data,
       for(p in 1:P) {
         family.beta[f.r,p] ~ dnorm(mu.order[f.r,p], family.tau[f.r])
         mu.order[f.r,p] <- inprod(order.beta[1:Order.R,p], OrderData[f.r,1:Order.R])
+        #Zero inflation component
+        family.beta.zero[f.r,p] ~ dnorm(mu.order.zero[f.r,p], family.tau.zero[f.r])
+        mu.order.zero[f.r,p] <- inprod(order.beta.zero[1:Order.R,p], OrderData[f.r,1:Order.R])
+
       }
+      # prior on precision
       family.tau[f.r] <- 1/(family.sigma[f.r]*family.sigma[f.r])
       family.sigma[f.r] ~ dunif(0,3)
+      family.tau.zero[f.r] <- 1/(family.sigma.zero[f.r]*family.sigma.zero[f.r])
+      family.sigma.zero[f.r] ~ dunif(0,3)
+
+      # g-estimation
+      family.eta.low[f.r] <- inprod(family.beta[f.r,1:P], profiles[1,1:P])
+      family.eta.high[f.r] <- inprod(family.beta[f.r,1:P], profiles[2,1:P])
+      family.psi[f.r] <- family.eta.high[f.r]-family.eta.low[f.r]
+      #zero inflation
+      family.eta.low.zero[f.r] <- inprod(family.beta.zero[f.r,1:P], profiles[1,1:P])
+      family.eta.high.zero[f.r] <- inprod(family.beta.zero[f.r,1:P], profiles[2,1:P])
+      family.psi.zero[f.r] <- family.eta.high.zero[f.r]-family.eta.low.zero[f.r]
     }
 
     # Order level
@@ -335,9 +383,24 @@ BaHZING_Model <- function(formatted_data,
       for(p in 1:P) {
         order.beta[o.r,p] ~ dnorm(mu.class[o.r,p], order.tau[o.r])
         mu.class[o.r,p] <- inprod(class.beta[1:Class.R,p], ClassData[o.r,1:Class.R])
+        #Zero inflation component
+        order.beta.zero[o.r,p] ~ dnorm(mu.class.zero[o.r,p], order.tau.zero[o.r])
+        mu.class.zero[o.r,p] <- inprod(class.beta.zero[1:Class.R,p], ClassData[o.r,1:Class.R])
       }
+      # prior on precision
       order.tau[o.r] <- 1/(order.sigma[o.r]*order.sigma[o.r])
       order.sigma[o.r] ~ dunif(0,3)
+      order.tau.zero[o.r] <- 1/(order.sigma.zero[o.r]*order.sigma.zero[o.r])
+      order.sigma.zero[o.r] ~ dunif(0,3)
+
+      # g-estimation
+      order.eta.low[o.r] <- inprod(order.beta[o.r,1:P], profiles[1,1:P])
+      order.eta.high[o.r] <- inprod(order.beta[o.r,1:P], profiles[2,1:P])
+      order.psi[o.r] <- order.eta.high[o.r]-order.eta.low[o.r]
+      #zero infl
+      order.eta.low.zero[o.r] <- inprod(order.beta.zero[o.r,1:P], profiles[1,1:P])
+      order.eta.high.zero[o.r] <- inprod(order.beta.zero[o.r,1:P], profiles[2,1:P])
+      order.psi.zero[o.r] <- order.eta.high.zero[o.r]-order.eta.low.zero[o.r]
     }
 
     # Class level
@@ -345,18 +408,49 @@ BaHZING_Model <- function(formatted_data,
       for(p in 1:P) {
         class.beta[c.r,p] ~ dnorm(mu.phylum[c.r,p], class.tau[c.r])
         mu.phylum[c.r,p] <- inprod(phylum.beta[1:Phylum.R,p], PhylumData[c.r,1:Phylum.R])
+        #Zero inflation component
+        class.beta.zero[c.r,p] ~ dnorm(mu.phylum.zero[c.r,p], class.tau.zero[c.r])
+        mu.phylum.zero[c.r,p] <- inprod(phylum.beta.zero[1:Phylum.R,p], PhylumData[c.r,1:Phylum.R])
       }
+      # prior on precision
       class.tau[c.r] <- 1/(class.sigma[c.r]*class.sigma[c.r])
       class.sigma[c.r] ~ dunif(0,3)
+      class.tau.zero[c.r] <- 1/(class.sigma.zero[c.r]*class.sigma.zero[c.r])
+      class.sigma.zero[c.r] ~ dunif(0,3)
+
+      # g-estimation
+      class.eta.low[c.r] <- inprod(class.beta[c.r,1:P], profiles[1,1:P])
+      class.eta.high[c.r] <- inprod(class.beta[c.r,1:P], profiles[2,1:P])
+      class.psi[c.r] <- class.eta.high[c.r]-class.eta.low[c.r]
+
+      #zero component
+      class.eta.low.zero[c.r] <- inprod(class.beta.zero[c.r,1:P], profiles[1,1:P])
+      class.eta.high.zero[c.r] <- inprod(class.beta.zero[c.r,1:P], profiles[2,1:P])
+      class.psi.zero[c.r] <- class.eta.high.zero[c.r]-class.eta.low.zero[c.r]
     }
 
     # Phylum level
     for(p.r in 1:Phylum.R) {
       for(p in 1:P) {
         phylum.beta[p.r,p] ~ dnorm(0, phylum.tau[p.r])
+        #Zero inflation component
+        phylum.beta.zero[p.r,p] ~ dnorm(0, phylum.tau.zero[p.r])
       }
+      # prior on precision
       phylum.tau[p.r] <- 1/(phylum.sigma[p.r]*phylum.sigma[p.r])
       phylum.sigma[p.r] ~ dunif(0,3)
+      phylum.tau.zero[p.r] <- 1/(phylum.sigma.zero[p.r]*phylum.sigma.zero[p.r])
+      phylum.sigma.zero[p.r] ~ dunif(0,3)
+
+      # g-estimation
+      phylum.eta.low[p.r] <- inprod(phylum.beta[p.r,1:P], profiles[1,1:P])
+      phylum.eta.high[p.r] <- inprod(phylum.beta[p.r,1:P], profiles[2,1:P])
+      phylum.psi[p.r] <- phylum.eta.high[p.r]-phylum.eta.low[p.r]
+
+      #Zero inflation
+      phylum.eta.low.zero[p.r] <- inprod(phylum.beta.zero[p.r,1:P], profiles[1,1:P])
+      phylum.eta.high.zero[p.r] <- inprod(phylum.beta.zero[p.r,1:P], profiles[2,1:P])
+      phylum.psi.zero[p.r] <- phylum.eta.high.zero[p.r]-phylum.eta.low.zero[p.r]
     }
 
   }"
@@ -372,8 +466,13 @@ BaHZING_Model <- function(formatted_data,
                   profiles=profiles,L=L)
 
     var.s <- c("species.beta", "genus.beta", "family.beta", "order.beta",
-               "class.beta", "phylum.beta", "psi", "disp")
-
+               "class.beta", "phylum.beta", "species.beta.zero",
+               "genus.beta.zero", "family.beta.zero", "order.beta.zero",
+               "class.beta.zero", "phylum.beta.zero","species.psi","genus.psi",
+               "family.psi","order.psi","class.psi","phylum.psi",
+               "species.psi.zero","genus.psi.zero","family.psi.zero",
+               "order.psi.zero","class.psi.zero","phylum.psi.zero",
+               "disp")
     model.fit <- jags.model(file=textConnection(BHRM.microbiome),
                             data=jdata,
                             n.chains=n.chains,
@@ -393,39 +492,74 @@ BaHZING_Model <- function(formatted_data,
     for(r in 1:R) {
       for(i in 1:N) {
         Y[i,r] ~ dnegbin(mu[i,r], disp[r])
-        mu[i,r] <- disp[r]/(disp[r]+lambda[i,r])
-        log(lambda[i,r]) <- alpha[r] + inprod(species.beta[r,1:P], X.q[i,1:P])
+        mu[i,r] <- disp[r]/(disp[r]+(1-zero[i,r])*lambda[i,r]) - 0.000001*zero[i,r]
+        log(lambda[i,r]) <- alpha[r] + inprod(species.beta[r,1:P], X.q[i,1:P]) + log(L[i,1])
+
+        # zero-inflation
+        zero[i,r] ~ dbern(pi[i,r])
+        logit(pi[i,r]) <- alpha.zero[r] + inprod(species.beta.zero[r,1:P], X.q[i,1:P]) + log(L[i,1])
       }
       # prior on dispersion parameter
       disp[r] ~ dunif(0,50)
 
       # prior on intercept
-      alpha[r] ~ dnorm(0, 1.0E-01)
+      alpha[r] ~ dnorm(0, 1.0E-02)
+      alpha.zero[r] ~ dnorm(0, 1.0E-02)
+
+       # # prior on covariate effects
+      # for(q in 1:Q) {
+      #   delta[r,q] ~ dnorm(0, 1.0E-02)
+      #   delta.zero[r,q] ~ dnorm(0, 1.0E-02)
+      # }
 
       # prior on exposure effects
       for(p in 1:P) {
         species.beta[r,p] ~ dnorm(mu.species[r,p], tau[r])
         mu.species[r,p] <- inprod(genus.beta[1:Genus.R,p], GenusData[r,1:Genus.R])
+        #Zero inflation component
+        species.beta.zero[r,p] ~ dnorm(mu.species.zero[r,p], tau.zero[r])
+        mu.species.zero[r,p] <- inprod(genus.beta.zero[1:Genus.R,p], GenusData[r,1:Genus.R])
       }
 
       # prior on precision
       tau[r] <- 1/(sigma[r]*sigma[r])
       sigma[r] ~ dunif(0,3)
+      tau.zero[r] <- 1/(sigma.zero[r]*sigma.zero[r])
+      sigma.zero[r] ~ dunif(0,3)
 
       # g-estimation
-      eta.low[r] <- inprod(species.beta[r,1:P], profiles[1,1:P])
-      eta.high[r] <- inprod(species.beta[r,1:P], profiles[2,1:P])
-      psi[r] <- eta.high[r]-eta.low[r]
+      species.eta.low[r] <- inprod(species.beta[r,1:P], profiles[1,1:P])
+      species.eta.high[r] <- inprod(species.beta[r,1:P], profiles[2,1:P])
+      species.psi[r] <- species.eta.high[r]-species.eta.low[r]
+      # zero-inflation
+      species.eta.low.zero[r] <- inprod(species.beta.zero[r,1:P], profiles[1,1:P])
+      species.eta.high.zero[r] <- inprod(species.beta.zero[r,1:P], profiles[2,1:P])
+      species.psi.zero[r] <- species.eta.high.zero[r]-species.eta.low.zero[r]
     }
 
     # Genus level
     for(g.r in 1:Genus.R) {
       for(p in 1:P) {
-        genus.beta[g.r,p] ~ dnorm(mu.family[g.r,p], genus.tau[g.r])
+        genus.beta[g.r,p] ~ dnorm(mu.family[g.r,p],genus.tau[g.r]) # should this be shared effects across exposures at genus level? or shared effects across all genus by exposure?
         mu.family[g.r,p] <- inprod(family.beta[1:Family.R,p], FamilyData[g.r,1:Family.R])
+        #Zero inflation component
+        genus.beta.zero[g.r,p] ~ dnorm(mu.family.zero[g.r,p],genus.tau.zero[g.r]) # should this be shared effects across exposures at genus level? or shared effects across all genus by exposure?
+        mu.family.zero[g.r,p] <- inprod(family.beta.zero[1:Family.R,p], FamilyData[g.r,1:Family.R])
       }
+      # prior on precision
       genus.tau[g.r] <- 1/(genus.sigma[g.r]*genus.sigma[g.r])
       genus.sigma[g.r] ~ dunif(0,3)
+      genus.tau.zero[g.r] <- 1/(genus.sigma.zero[g.r]*genus.sigma.zero[g.r])
+      genus.sigma.zero[g.r] ~ dunif(0,3)
+
+      # g-estimation
+      genus.eta.low[g.r] <- inprod(genus.beta[g.r,1:P], profiles[1,1:P])
+      genus.eta.high[g.r] <- inprod(genus.beta[g.r,1:P], profiles[2,1:P])
+      genus.psi[g.r] <- genus.eta.high[g.r]-genus.eta.low[g.r]
+      #zero inflation
+      genus.eta.low.zero[g.r] <- inprod(genus.beta.zero[g.r,1:P], profiles[1,1:P])
+      genus.eta.high.zero[g.r] <- inprod(genus.beta.zero[g.r,1:P], profiles[2,1:P])
+      genus.psi.zero[g.r] <- genus.eta.high.zero[g.r]-genus.eta.low.zero[g.r]
     }
 
     # Family level
@@ -433,9 +567,25 @@ BaHZING_Model <- function(formatted_data,
       for(p in 1:P) {
         family.beta[f.r,p] ~ dnorm(mu.order[f.r,p], family.tau[f.r])
         mu.order[f.r,p] <- inprod(order.beta[1:Order.R,p], OrderData[f.r,1:Order.R])
+        #Zero inflation component
+        family.beta.zero[f.r,p] ~ dnorm(mu.order.zero[f.r,p], family.tau.zero[f.r])
+        mu.order.zero[f.r,p] <- inprod(order.beta.zero[1:Order.R,p], OrderData[f.r,1:Order.R])
+
       }
+      # prior on precision
       family.tau[f.r] <- 1/(family.sigma[f.r]*family.sigma[f.r])
       family.sigma[f.r] ~ dunif(0,3)
+      family.tau.zero[f.r] <- 1/(family.sigma.zero[f.r]*family.sigma.zero[f.r])
+      family.sigma.zero[f.r] ~ dunif(0,3)
+
+      # g-estimation
+      family.eta.low[f.r] <- inprod(family.beta[f.r,1:P], profiles[1,1:P])
+      family.eta.high[f.r] <- inprod(family.beta[f.r,1:P], profiles[2,1:P])
+      family.psi[f.r] <- family.eta.high[f.r]-family.eta.low[f.r]
+      #zero inflation
+      family.eta.low.zero[f.r] <- inprod(family.beta.zero[f.r,1:P], profiles[1,1:P])
+      family.eta.high.zero[f.r] <- inprod(family.beta.zero[f.r,1:P], profiles[2,1:P])
+      family.psi.zero[f.r] <- family.eta.high.zero[f.r]-family.eta.low.zero[f.r]
     }
 
     # Order level
@@ -443,9 +593,24 @@ BaHZING_Model <- function(formatted_data,
       for(p in 1:P) {
         order.beta[o.r,p] ~ dnorm(mu.class[o.r,p], order.tau[o.r])
         mu.class[o.r,p] <- inprod(class.beta[1:Class.R,p], ClassData[o.r,1:Class.R])
+        #Zero inflation component
+        order.beta.zero[o.r,p] ~ dnorm(mu.class.zero[o.r,p], order.tau.zero[o.r])
+        mu.class.zero[o.r,p] <- inprod(class.beta.zero[1:Class.R,p], ClassData[o.r,1:Class.R])
       }
+      # prior on precision
       order.tau[o.r] <- 1/(order.sigma[o.r]*order.sigma[o.r])
       order.sigma[o.r] ~ dunif(0,3)
+      order.tau.zero[o.r] <- 1/(order.sigma.zero[o.r]*order.sigma.zero[o.r])
+      order.sigma.zero[o.r] ~ dunif(0,3)
+
+      # g-estimation
+      order.eta.low[o.r] <- inprod(order.beta[o.r,1:P], profiles[1,1:P])
+      order.eta.high[o.r] <- inprod(order.beta[o.r,1:P], profiles[2,1:P])
+      order.psi[o.r] <- order.eta.high[o.r]-order.eta.low[o.r]
+      #zero infl
+      order.eta.low.zero[o.r] <- inprod(order.beta.zero[o.r,1:P], profiles[1,1:P])
+      order.eta.high.zero[o.r] <- inprod(order.beta.zero[o.r,1:P], profiles[2,1:P])
+      order.psi.zero[o.r] <- order.eta.high.zero[o.r]-order.eta.low.zero[o.r]
     }
 
     # Class level
@@ -453,18 +618,49 @@ BaHZING_Model <- function(formatted_data,
       for(p in 1:P) {
         class.beta[c.r,p] ~ dnorm(mu.phylum[c.r,p], class.tau[c.r])
         mu.phylum[c.r,p] <- inprod(phylum.beta[1:Phylum.R,p], PhylumData[c.r,1:Phylum.R])
+        #Zero inflation component
+        class.beta.zero[c.r,p] ~ dnorm(mu.phylum.zero[c.r,p], class.tau.zero[c.r])
+        mu.phylum.zero[c.r,p] <- inprod(phylum.beta.zero[1:Phylum.R,p], PhylumData[c.r,1:Phylum.R])
       }
+      # prior on precision
       class.tau[c.r] <- 1/(class.sigma[c.r]*class.sigma[c.r])
       class.sigma[c.r] ~ dunif(0,3)
+      class.tau.zero[c.r] <- 1/(class.sigma.zero[c.r]*class.sigma.zero[c.r])
+      class.sigma.zero[c.r] ~ dunif(0,3)
+
+      # g-estimation
+      class.eta.low[c.r] <- inprod(class.beta[c.r,1:P], profiles[1,1:P])
+      class.eta.high[c.r] <- inprod(class.beta[c.r,1:P], profiles[2,1:P])
+      class.psi[c.r] <- class.eta.high[c.r]-class.eta.low[c.r]
+
+      #zero component
+      class.eta.low.zero[c.r] <- inprod(class.beta.zero[c.r,1:P], profiles[1,1:P])
+      class.eta.high.zero[c.r] <- inprod(class.beta.zero[c.r,1:P], profiles[2,1:P])
+      class.psi.zero[c.r] <- class.eta.high.zero[c.r]-class.eta.low.zero[c.r]
     }
 
     # Phylum level
     for(p.r in 1:Phylum.R) {
       for(p in 1:P) {
         phylum.beta[p.r,p] ~ dnorm(0, phylum.tau[p.r])
+        #Zero inflation component
+        phylum.beta.zero[p.r,p] ~ dnorm(0, phylum.tau.zero[p.r])
       }
+      # prior on precision
       phylum.tau[p.r] <- 1/(phylum.sigma[p.r]*phylum.sigma[p.r])
       phylum.sigma[p.r] ~ dunif(0,3)
+      phylum.tau.zero[p.r] <- 1/(phylum.sigma.zero[p.r]*phylum.sigma.zero[p.r])
+      phylum.sigma.zero[p.r] ~ dunif(0,3)
+
+      # g-estimation
+      phylum.eta.low[p.r] <- inprod(phylum.beta[p.r,1:P], profiles[1,1:P])
+      phylum.eta.high[p.r] <- inprod(phylum.beta[p.r,1:P], profiles[2,1:P])
+      phylum.psi[p.r] <- phylum.eta.high[p.r]-phylum.eta.low[p.r]
+
+      #Zero inflation
+      phylum.eta.low.zero[p.r] <- inprod(phylum.beta.zero[p.r,1:P], profiles[1,1:P])
+      phylum.eta.high.zero[p.r] <- inprod(phylum.beta.zero[p.r,1:P], profiles[2,1:P])
+      phylum.psi.zero[p.r] <- phylum.eta.high.zero[p.r]-phylum.eta.low.zero[p.r]
     }
 
   }"
@@ -480,8 +676,13 @@ BaHZING_Model <- function(formatted_data,
                     profiles=profiles,L=L)
 
     var.s <- c("species.beta", "genus.beta", "family.beta", "order.beta",
-                 "class.beta", "phylum.beta", "psi", "disp")
-
+               "class.beta", "phylum.beta", "species.beta.zero",
+               "genus.beta.zero", "family.beta.zero", "order.beta.zero",
+               "class.beta.zero", "phylum.beta.zero","species.psi","genus.psi",
+               "family.psi","order.psi","class.psi","phylum.psi",
+               "species.psi.zero","genus.psi.zero","family.psi.zero",
+               "order.psi.zero","class.psi.zero","phylum.psi.zero",
+               "disp")
     model.fit <- jags.model(file=textConnection(BHRM.microbiome), data=jdata,
                             n.chains=n.chains, n.adapt=n.adapt, quiet=F)
     update(model.fit, n.iter=n.iter.burnin, progress.bar="text")
@@ -498,8 +699,7 @@ BaHZING_Model <- function(formatted_data,
   # x1 <- HPDinterval(model.fit[[1]], prob = 0.95)  %>% as.data.frame()
 
   ## Calculate p-values  ------
-  # post_dist <-  as.data.frame(model.fit[[1]])[, grep("beta|zero|psi", colnames(model.fit[[1]]))]
-  post_dist <- as.data.frame(model.fit[[1]])[, grep("beta|psi", colnames(model.fit[[1]]))]
+  post_dist <-  as.data.frame(model.fit[[1]])[, grep("beta|zero|psi", colnames(model.fit[[1]]))]
 
   ### p_direction ----
   pdir <- apply(post_dist, 2, function(x){
@@ -534,21 +734,14 @@ BaHZING_Model <- function(formatted_data,
   # bayestestR::p_rope(post_dist$`species.beta[189,2]`, rope = c(-0.1, 0.1))
 
   ## Create "component" variable ----
-  # results <- results %>%
-  #   mutate(
-  #     component=case_when(
-  #       grepl("zero",rownames(.)) ~ "Zero-inflation model coefficients",
-  #       grepl("beta",rownames(.)) ~ "Count model coefficients",
-  #       grepl("psi",rownames(.))  ~ "Count model coefficients",
-  #       grepl("disp",rownames(.)) ~ "Dispersion",
-  #       grepl("omega",rownames(.)) ~ "Omega",
-  #       TRUE ~ "Other"))
   results <- results %>%
     mutate(
       component=case_when(
+        grepl("zero",rownames(.)) ~ "Zero-inflation model coefficients",
         grepl("beta",rownames(.)) ~ "Count model coefficients",
         grepl("psi",rownames(.))  ~ "Count model coefficients",
         grepl("disp",rownames(.)) ~ "Dispersion",
+        grepl("omega",rownames(.)) ~ "Omega",
         TRUE ~ "Other"))
 
   # Calculate significance based on Bayesian Interval, rename variables (removed- jg 02_13_25 in place of p-values)
@@ -625,9 +818,9 @@ BaHZING_Model <- function(formatted_data,
   # Get Taxa and domain information for
   results2 <- results2 %>%
     mutate(taxa_full=ifelse(grepl("disp", rownames(results2)),paste0(species[taxa_index]),taxa_full),
-           taxa_full=ifelse(grepl("^psi", rownames(results2)),paste0(species[taxa_index]),taxa_full),
+           taxa_full=ifelse(grepl("omega",rownames(results2)),paste0(species[taxa_index]),taxa_full),
            taxa_name = sub(".*__", "", taxa_full),
-           domain = ifelse(exposure == "Dispersion" | exposure == "Mixture",
+           domain = ifelse(exposure == "Dispersion" | exposure == "Omega",
                            "Species", domain))
 
   # Remove "disp" and "omega" estimates
