@@ -104,7 +104,21 @@ Ridge_BaHZING_Model <- function(formatted_data,
                                 q = NULL,
                                 verbose = TRUE,
                                 return_all_estimates = FALSE,
-                                ROPE_range = c(-0.1, 0.1)) {
+                                ROPE_range = c(-0.1, 0.1),
+                                seed = NULL) {
+
+  # Added by HW based on Yanqi's modification for BaHZING
+
+  # JAGS has its own RNG, independent of R's - set.seed() alone has no effect
+  # on it. Reproducible runs require explicit .RNG.name/.RNG.seed per chain
+  # passed as `inits` to jags.model().
+  jags_inits <- if (!is.null(seed)) {
+    lapply(seq_len(n.chains), function(i) {
+      list(.RNG.name = "base::Wichmann-Hill", .RNG.seed = seed + i)
+    })
+  } else {
+    NULL
+  }
 
   # 1. Check input data ----
   # Extract metadata file from formatted data
@@ -403,12 +417,48 @@ Ridge_BaHZING_Model <- function(formatted_data,
     # Variables to monitor
     var.s <- c("beta", "beta.zero","psi","disp")
 
+    # Added by HW based on Yanqi's modificaiton for BaHZING---
+    if (is.null(jags_inits)) {
+      # Without an explicit seed, each chain still needs a distinct RNG seed
+      # decided here in the parent process before forking - a forked child's
+      # RNG state is otherwise copied identically from the parent, which would
+      # give every "independent" chain the same draws.
+      chain_seeds <- sample.int(1e6, n.chains)
+      jags_inits <- lapply(chain_seeds, function(s) {
+        list(.RNG.name = "base::Wichmann-Hill", .RNG.seed = s)
+      })
+    }
+
     # Run JAGS model
-    model.fit <- jags.model(file=textConnection(jags_model_func),
-                            data=jdata, n.chains=n.chains, n.adapt=n.adapt, quiet=FALSE)
-    update(model.fit, n.iter=n.iter.burnin, progress.bar="text")
-    model.fit <- coda.samples(model=model.fit, variable.names=var.s,
-                              n.iter=n.iter.sample, thin=1, progress.bar="text")
+    # model.fit <- jags.model(file=textConnection(jags_model_func),
+    #                         data=jdata, n.chains=n.chains, n.adapt=n.adapt, quiet=FALSE)
+    # update(model.fit, n.iter=n.iter.burnin, progress.bar="text")
+    # model.fit <- coda.samples(model=model.fit, variable.names=var.s,
+    #                           n.iter=n.iter.sample, thin=1, progress.bar="text")
+    #
+    # Modified by HW based on Yanqi's update for BaHZING
+    run_one_chain <- function(i) {
+      m <- jags.model(file=textConnection(jags_model_func), data=jdata,
+                      inits=list(jags_inits[[i]]), n.chains=1, n.adapt=n.adapt,
+                      quiet=TRUE)
+      update(m, n.iter=n.iter.burnin, progress.bar="none")
+      chain <- coda.samples(model=m, variable.names=var.s, n.iter=n.iter.sample,
+                            thin=1, progress.bar="none")
+      chain[[1]]
+    }
+
+    chain_list <- parallel::mclapply(seq_len(n.chains), run_one_chain,
+                                     mc.cores = min(n.chains, parallel::detectCores()))
+    failed <- vapply(chain_list, function(x) inherits(x, "try-error"), logical(1))
+    if (any(failed)) {
+      msgs <- vapply(chain_list[failed], function(x) {
+        cond <- attr(x, "condition")
+        if (!is.null(cond)) conditionMessage(cond) else as.character(x)
+      }, character(1))
+      stop("Parallel chain(s) failed: ", paste(unique(msgs), collapse = "; "))
+    }
+
+    model.fit <- coda::as.mcmc.list(chain_list)
 
     # Summarize results
     r <- summary(model.fit)
@@ -417,15 +467,32 @@ Ridge_BaHZING_Model <- function(formatted_data,
       round(r$quantiles[,c(1,5)],3)
     )
 
-    # Extract posterior draws
-    post_dist <- as.data.frame(model.fit[[1]])[, grep("beta|zero|psi", colnames(model.fit[[1]]))]
+    # # Extract posterior draws
+    # post_dist <- as.data.frame(model.fit[[1]])[, grep("beta|zero|psi", colnames(model.fit[[1]]))]
+    #
+    # # Bayesian p-values
+    # pdir <- apply(post_dist, 2, function(x) p_direction(x, threshold=0.05) %>% as.numeric())
+    # prope <- apply(post_dist, 2, function(x) p_rope(x, rope=ROPE_range)$p_ROPE)
+    # pmap <- apply(post_dist, 2, function(x) p_map(x) %>% as.numeric())
+    #
+    # p_value_df <- data.frame(name = names(pdir), pdir = pdir, prope = prope, pmap = pmap)
 
-    # Bayesian p-values
-    pdir <- apply(post_dist, 2, function(x) p_direction(x, threshold=0.05) %>% as.numeric())
-    prope <- apply(post_dist, 2, function(x) p_rope(x, rope=ROPE_range)$p_ROPE)
-    pmap <- apply(post_dist, 2, function(x) p_map(x) %>% as.numeric())
+    # Modified by HW to improve efficiency based on Yanqi's update for BaHZING
+    post_dist <- as.matrix(model.fit[[1]])[, grep("beta|zero|psi", colnames(model.fit[[1]])), drop = FALSE]
 
-    p_value_df <- data.frame(name = names(pdir), pdir = pdir, prope = prope, pmap = pmap)
+
+
+    p_stats <- apply(post_dist, 2, function(x) {
+      c(pdir  = as.numeric(p_direction(x, threshold = 0.05)),
+        prope = p_rope(x, rope = ROPE_range)$p_ROPE,
+        pmap  = as.numeric(p_map(x)))
+    })
+
+
+    # Get dataframe of p-values
+
+    p_value_df <- data.frame(name = colnames(post_dist), t(p_stats), row.names = NULL)
+
 
     # Format results
     results <- results %>%
