@@ -7,6 +7,7 @@ Authors@R: c(
     person("Jesse", "Goodrich", , "jagoodri@usc.edu", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0001-6615-0472")),
     person("Hongxu", "Wang", , "hongxuwa@usc.edu", role = "aut"),
+    person("Yanqi", "Huang", , "YANQI.2.HUANG@CUANSCHUTZ.EDU", role = "aut"),
     person("Tanya", "Alderete", , "taldere1@jhu.edu", role = "ctb"),
     person("Shardul", "Nazirkar", , "nazirkar@usc.edu", role = "ctb"),
     person("David", "Conti", , "dconti@usc.edu", role = "aut")
