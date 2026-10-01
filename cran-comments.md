@@ -1,6 +1,6 @@
 ## R CMD check results
 
-0 errors | 0 warnings | 1 note
+0 errors | 0 warnings | 2 notes
 
 ## Resubmission
 
@@ -20,6 +20,10 @@ in R code analysis.
 
 ## Notes
 
-* The remaining NOTE is the expected CRAN incoming note that this is a new
+* The first NOTE is the expected CRAN incoming note that this is a new
   submission of a package that was previously archived, as explained above.
+* The second NOTE was emitted while checking for future file timestamps:
+  `unable to verify current time`. The local check environment could not
+  perform external time verification; no package files were identified as
+  having future timestamps.
 * JAGS 4.x.y is required, as declared in SystemRequirements.
